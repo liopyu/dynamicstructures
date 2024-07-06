@@ -3,11 +3,13 @@ package net.liopyu.dynamicstructures.events.server;
 import net.liopyu.dynamicstructures.structures.DungeonGenerator;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import static net.liopyu.dynamicstructures.DynamicStructures.MODID;
+import static net.liopyu.dynamicstructures.structures.DungeonGenerator.generateLadderRoom;
 
 @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ServerForgeEvents {
@@ -20,7 +22,8 @@ public class ServerForgeEvents {
         if (!event.getLevel().isClientSide()){
             var serverLevel = (ServerLevel) event.getLevel();
             Direction direction = event.getEntity().getDirection();
-            DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),10,10);
+            generateLadderRoom(serverLevel, blockPos, 10, 10, 10, Blocks.ACACIA_PLANKS, Blocks.BIRCH_WOOD, Blocks.STONE_SLAB,true,);
+            //DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),10,10);
         }
     }
 }
