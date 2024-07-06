@@ -20,7 +20,7 @@ public class ServerForgeEvents {
         if (!event.getLevel().isClientSide()){
             var serverLevel = (ServerLevel) event.getLevel();
             Direction direction = event.getEntity().getDirection();
-            DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),10);
+            DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),10,10);
         }
     }
 }
