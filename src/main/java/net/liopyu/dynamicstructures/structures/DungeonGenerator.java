@@ -4,6 +4,7 @@ import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -30,7 +31,7 @@ public class DungeonGenerator {
             Blocks.OAK_SLAB, Blocks.STONE_SLAB, Blocks.BRICK_SLAB, Blocks.COBBLESTONE_SLAB
     };
 
-    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height) {
+    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height,int width,int length) {
         Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
         Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
         Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
@@ -44,24 +45,24 @@ public class DungeonGenerator {
 
             if (isLadderRoom) {
                 // Generate both lower and upper ladder rooms
-                generateLadderRoom(world, currentPos, 10, 10, height, floorBlock, wallBlock, roofBlock, true);
+                generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true);
 
                 // Place doorways for both lower and upper rooms
-                placeDoorway(world, currentPos, 10, 10, currentDirection, random);
+                placeDoorway(world, currentPos, width, length, currentDirection, random);
                 BlockPos upperRoomPos = currentPos.above(height);
-                placeDoorway(world, upperRoomPos, 10, 10, currentDirection, random);
+                placeDoorway(world, upperRoomPos, width, length, currentDirection, random);
 
                 // Move to the next room position after the upper room
-                currentPos = calculateNextRoomPos(upperRoomPos, 10, 10, currentDirection);
+                currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
             } else {
-                Set<BlockPos> currentRoomWalls = generateRoom(world, currentPos, 10, 10, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
+                Set<BlockPos> currentRoomWalls = generateRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
                 previousRoomWalls = currentRoomWalls;
 
                 // Place the doorway for the regular room
-                placeDoorway(world, currentPos, 10, 10, currentDirection, random);
+                placeDoorway(world, currentPos, width, length, currentDirection, random);
 
                 // Move to the next room position
-                currentPos = calculateNextRoomPos(currentPos, 10, 10, currentDirection);
+                currentPos = calculateNextRoomPos(currentPos, width, length, currentDirection);
             }
 
             // Randomly change the direction for the next room
@@ -169,7 +170,7 @@ public class DungeonGenerator {
     }
     private static void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
         if (overlapWalls != null && overlapWalls.contains(pos)) {
-            if (forceOverlap) {
+            if (forceOverlap || Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos).getBlock())) {
                 // Force overlap: Place the wall block even if it overlaps with an existing wall
                 world.setBlock(pos, block.defaultBlockState(), 3);
                 wallPositions.add(pos);
@@ -188,12 +189,12 @@ public class DungeonGenerator {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos roofPos = pos.offset(x, height + 1, z);
-
-                // Check if the block at the roof position is a wall block
-                if (Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(roofPos).getBlock())) {
-                    continue; // Skip placing a roof block if a wall block is already present
+                if (!(world.getBlockState(roofPos).is(BlockTags.REPLACEABLE)||
+                        world.getBlockState(roofPos).is(Blocks.AIR)||
+                        world.getBlockState(roofPos).is(Blocks.CAVE_AIR)||
+                        Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(roofPos).getBlock()))){
+                    continue;
                 }
-
                 // Place the roof block if no wall block is present
                 world.setBlock(roofPos, roofBlock.defaultBlockState(), 3);
             }

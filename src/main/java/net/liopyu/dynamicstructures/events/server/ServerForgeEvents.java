@@ -32,7 +32,7 @@ public class ServerForgeEvents {
             Direction direction = event.getEntity().getDirection();
 
             //generateLadderRoom(serverLevel, blockPos, 10, 10, 10, Blocks.ACACIA_PLANKS, Blocks.BIRCH_WOOD, Blocks.STONE_SLAB, true);
-            DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),100,10);
+            DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),15,10,15,15);
         }
     }
 }
