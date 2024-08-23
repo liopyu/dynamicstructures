@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.state.properties.Half;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class DungeonGenerator {
@@ -29,7 +30,7 @@ public class DungeonGenerator {
             Blocks.OAK_SLAB, Blocks.STONE_SLAB, Blocks.BRICK_SLAB, Blocks.COBBLESTONE_SLAB
     };
 
-    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height,boolean forceOverlap) {
+    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height) {
         Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
         Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
         Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
@@ -42,22 +43,35 @@ public class DungeonGenerator {
             boolean isLadderRoom = random.nextInt(10) < 2; // 20% chance for a ladder room
 
             if (isLadderRoom) {
-                generateLadderRoom(world, currentPos, 10, 10, height, floorBlock, wallBlock, roofBlock,forceOverlap,ROOF_BLOCKS);
+                // Generate both lower and upper ladder rooms
+                generateLadderRoom(world, currentPos, 10, 10, height, floorBlock, wallBlock, roofBlock, true);
+
+                // Place doorways for both lower and upper rooms
+                placeDoorway(world, currentPos, 10, 10, currentDirection, random);
+                BlockPos upperRoomPos = currentPos.above(height);
+                placeDoorway(world, upperRoomPos, 10, 10, currentDirection, random);
+
+                // Move to the next room position after the upper room
+                currentPos = calculateNextRoomPos(upperRoomPos, 10, 10, currentDirection);
             } else {
-                Set<BlockPos> currentRoomWalls = generateRoom(world, currentPos, 10, 10, height, floorBlock, wallBlock, roofBlock, previousRoomWalls,forceOverlap);
+                Set<BlockPos> currentRoomWalls = generateRoom(world, currentPos, 10, 10, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
                 previousRoomWalls = currentRoomWalls;
+
+                // Place the doorway for the regular room
+                placeDoorway(world, currentPos, 10, 10, currentDirection, random);
+
+                // Move to the next room position
+                currentPos = calculateNextRoomPos(currentPos, 10, 10, currentDirection);
             }
 
-            placeDoorway(world, currentPos, 10, 10, currentDirection, random);
-
-            BlockPos nextPos = calculateNextRoomPos(currentPos, 10, 10, currentDirection);
+            // Randomly change the direction for the next room
             currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
-            currentPos = nextPos;
         }
     }
-    public static void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock,boolean forceOverlap,Block[] excludeBlocks) {
+
+    public static void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, boolean forceOverlap) {
         // Generate the lower room
-        Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, null,forceOverlap,excludeBlocks);
+        Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, null, forceOverlap,true);
 
         // Place the ladder on one of the walls
         Direction ladderFacing = Direction.EAST; // Typically the ladder would face towards the interior
@@ -76,22 +90,13 @@ public class DungeonGenerator {
         BlockPos topRoomPos = basePos.above(height);
 
         // Generate the upper room, making sure to override the ceiling of the lower room
-        generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls,forceOverlap);
+        generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls, true,false);
 
         // Ensure there's an opening at the top of the ladder into the new room
         BlockPos opening = ladderBase.above(height);
         world.setBlock(opening, Blocks.AIR.defaultBlockState(), 3); // Clear the entry point into the upper room
-
-        // Replace the ceiling of the lower room with the floor of the upper room
-        /*for (int x = 0; x < width; x++) {
-            for (int z = 0; z < length; z++) {
-                BlockPos floorPos = topRoomPos.offset(x, 0, z);
-                if (world.getBlockState(floorPos).getBlock() == roofBlock) {
-                    world.setBlock(floorPos.above(), Blocks.BEDROCK.defaultBlockState(), 3);
-                }  // Set floor, replacing the old ceiling
-            }
-        }*/
     }
+
     private static Set<BlockPos> generateLadderRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap) {
         Set<BlockPos> wallPositions = new HashSet<>();
 
@@ -103,17 +108,22 @@ public class DungeonGenerator {
 
         return wallPositions;
     }
-    private static Set<BlockPos> generateRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap) {
+    private static Set<BlockPos> generateRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap, boolean isBottomRoom) {
         Set<BlockPos> wallPositions = new HashSet<>();
 
-        generateWalls(world, pos, width, length, height, wallBlock, wallPositions, overlapWalls,forceOverlap);
+        generateWalls(world, pos, width, length, height, wallBlock, wallPositions, overlapWalls, forceOverlap);
         generateFloor(world, pos, width, length, floorBlock, wallPositions);
-        generateRoof(world, pos, width, length, height, roofBlock);
+
+        // Skip roof generation if this is the bottom room of a ladder structure
+        if (!isBottomRoom) {
+            generateRoof(world, pos, width, length, height, roofBlock);
+        }
 
         fillRoomInteriorWithAir(world, pos, width, length, height, wallPositions);
 
         return wallPositions;
     }
+
 
     private static void fillRoomInteriorWithAir(ServerLevel world, BlockPos pos, int width, int length, int height, Set<BlockPos> wallPositions) {
         for (int x = 1; x < width - 1; x++) {
@@ -133,12 +143,17 @@ public class DungeonGenerator {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos floorPos = pos.offset(x, 0, z);
-                if (!wallPositions.contains(floorPos)) {
+
+                // Check if the block below the floor position is a ladder
+                if (world.getBlockState(floorPos).getBlock() instanceof LadderBlock) {
+                    world.setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3);
+                } else if (!wallPositions.contains(floorPos)) {
                     world.setBlock(floorPos, floorBlock.defaultBlockState(), 3);
                 }
             }
         }
     }
+
 
     private static void generateWalls(ServerLevel world, BlockPos pos, int width, int length, int height, Block wallBlock, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls,boolean forceOverlap) {
         for (int y = 1; y <= height + 1; y++) {
@@ -152,17 +167,45 @@ public class DungeonGenerator {
             }
         }
     }
-    private static void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls,boolean forceOverlap) {
-        if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls, world)) {
-            world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-        } else if (world.getBlockState(pos).isAir()){
+    private static void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
+        if (overlapWalls != null && overlapWalls.contains(pos)) {
+            if (forceOverlap) {
+                // Force overlap: Place the wall block even if it overlaps with an existing wall
                 world.setBlock(pos, block.defaultBlockState(), 3);
                 wallPositions.add(pos);
+            } else if (isSharedWall(pos, overlapWalls, world)) {
+                // If not forcing overlap, clear the position (place air) if it's a shared wall
+                world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            }
+        } else if (world.getBlockState(pos).isAir()) {
+            // Place the wall block normally if the position is not part of overlapWalls or it's air
+            world.setBlock(pos, block.defaultBlockState(), 3);
+            wallPositions.add(pos);
         }
     }
+
     private static void generateRoof(ServerLevel world, BlockPos pos, int width, int length, int height, Block roofBlock) {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
+                BlockPos roofPos = pos.offset(x, height + 1, z);
+
+                // Check if the block at the roof position is a wall block
+                if (Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(roofPos).getBlock())) {
+                    continue; // Skip placing a roof block if a wall block is already present
+                }
+
+                // Place the roof block if no wall block is present
+                world.setBlock(roofPos, roofBlock.defaultBlockState(), 3);
+            }
+        }
+    }
+
+    private static void generateRoof(ServerLevel world, BlockPos pos, int width, int length, int height, Block roofBlock,boolean forceOverlap) {
+        for (int x = 0; x < width; x++) {
+            for (int z = 0; z < length; z++) {
+                if (Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(pos.offset(x, height + 1, z)).getBlock())||
+                        Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos.offset(x, height + 1, z)).getBlock())||
+                        Arrays.stream(FLOOR_BLOCKS).toList().contains(world.getBlockState(pos.offset(x, height + 1, z)).getBlock())) return;
                 world.setBlock(pos.offset(x, height + 1, z), roofBlock.defaultBlockState(), 3);
             }
         }
