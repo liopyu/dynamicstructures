@@ -6,10 +6,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LadderBlock;
-import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 
@@ -31,7 +28,7 @@ public class DungeonGenerator {
             Blocks.OAK_SLAB, Blocks.STONE_SLAB, Blocks.BRICK_SLAB, Blocks.COBBLESTONE_SLAB
     };
 
-    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height,int width,int length) {
+    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height, int baseWidth, int baseLength) {
         Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
         Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
         Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
@@ -41,11 +38,15 @@ public class DungeonGenerator {
         Direction currentDirection = startDirection;
 
         for (int i = 0; i < roomCount; i++) {
+            // Calculate random width and length within 30% of the base values
+            int width = getRandomSize(baseWidth, random);
+            int length = getRandomSize(baseLength, random);
+
             boolean isLadderRoom = random.nextInt(10) < 2; // 20% chance for a ladder room
 
             if (isLadderRoom) {
                 // Generate both lower and upper ladder rooms
-                generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true);
+                generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true,currentDirection);
 
                 // Place doorways for both lower and upper rooms
                 placeDoorway(world, currentPos, width, length, currentDirection, random);
@@ -70,7 +71,16 @@ public class DungeonGenerator {
         }
     }
 
-    public static void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, boolean forceOverlap) {
+    private static int getRandomSize(int baseSize, RandomSource random) {
+        // Calculate 30% of the base size
+        int variation = (int) (baseSize * 0.3);
+
+        // Randomly adjust the size within ±30% of the base size
+        return baseSize + random.nextInt(variation * 2 + 1) - variation;
+    }
+
+
+    public static void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, boolean forceOverlap,Direction currentDirection) {
         // Generate the lower room
         Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, null, forceOverlap,true);
 
@@ -96,6 +106,7 @@ public class DungeonGenerator {
         // Ensure there's an opening at the top of the ladder into the new room
         BlockPos opening = ladderBase.above(height);
         world.setBlock(opening, Blocks.AIR.defaultBlockState(), 3); // Clear the entry point into the upper room
+        placeDoorway(world, basePos, width, length, currentDirection, world.random);
     }
 
     private static Set<BlockPos> generateLadderRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap) {
@@ -169,8 +180,12 @@ public class DungeonGenerator {
         }
     }
     private static void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
-        if (overlapWalls != null && overlapWalls.contains(pos)) {
-            if (forceOverlap || Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos).getBlock())) {
+        if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos).getBlock())||
+                world.getBlockState(pos).getBlock() instanceof LiquidBlock){
+            world.setBlock(pos, block.defaultBlockState(), 3);
+            wallPositions.add(pos);
+        }else if (overlapWalls != null && overlapWalls.contains(pos)) {
+            if (forceOverlap) {
                 // Force overlap: Place the wall block even if it overlaps with an existing wall
                 world.setBlock(pos, block.defaultBlockState(), 3);
                 wallPositions.add(pos);
@@ -189,7 +204,7 @@ public class DungeonGenerator {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos roofPos = pos.offset(x, height + 1, z);
-                if (!(world.getBlockState(roofPos).is(BlockTags.REPLACEABLE)||
+                if (!(world.getBlockState(roofPos).getBlock() instanceof LiquidBlock||
                         world.getBlockState(roofPos).is(Blocks.AIR)||
                         world.getBlockState(roofPos).is(Blocks.CAVE_AIR)||
                         Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(roofPos).getBlock()))){
@@ -233,17 +248,22 @@ public class DungeonGenerator {
 
         BlockPos doorPosBottom1 = pos;
         BlockPos doorPosBottom2 = pos;
+        BlockPos outwardPos;
 
         switch (direction) {
             case NORTH, SOUTH -> {
                 int doorX = (width / 2) + offset; // Adjust door position along the width
                 doorPosBottom1 = pos.offset(doorX, 1, direction == Direction.NORTH ? 0 : length - 1);
                 doorPosBottom2 = pos.offset(doorX, 2, direction == Direction.NORTH ? 0 : length - 1);
+                // Calculate the position one block outward
+                outwardPos = doorPosBottom1.relative(direction == Direction.NORTH ? Direction.NORTH : Direction.SOUTH);
             }
             case EAST, WEST -> {
                 int doorZ = (length / 2) + offset; // Adjust door position along the length
                 doorPosBottom1 = pos.offset(direction == Direction.WEST ? 0 : width - 1, 1, doorZ);
                 doorPosBottom2 = pos.offset(direction == Direction.WEST ? 0 : width - 1, 2, doorZ);
+                // Calculate the position one block outward
+                outwardPos = doorPosBottom1.relative(direction == Direction.WEST ? Direction.WEST : Direction.EAST);
             }
             default -> {
                 DSHelperClass.logErrorMessage("Unexpected direction: " + direction);
@@ -251,9 +271,16 @@ public class DungeonGenerator {
             }
         }
 
+        // Check if the block one block outward is in the roof block array
+        if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(outwardPos).getBlock())) {
+            return; // Do not place the doorway if the outward block is a roof block
+        }
+
+        // Place the doorway blocks if the condition is not met
         world.setBlock(doorPosBottom1, Blocks.AIR.defaultBlockState(), 3);
         world.setBlock(doorPosBottom2, Blocks.AIR.defaultBlockState(), 3);
     }
+
 
     private static BlockPos calculateNextRoomPos(BlockPos pos, int width, int length, Direction direction) {
         return switch (direction) {
