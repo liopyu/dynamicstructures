@@ -32,9 +32,6 @@ public class DungeonGenerator {
     private static final Block[] ROOF_BLOCKS = {
             Blocks.OAK_SLAB, Blocks.STONE_SLAB, Blocks.BRICK_SLAB, Blocks.COBBLESTONE_SLAB
     };
-    public static final EntityType<?>[] ENTITY_TYPES = {
-            EntityType.ZOMBIE, EntityType.WITCH, EntityType.SKELETON, EntityType.CREEPER
-    };
     protected static int defaultDoorwayRadius = 3;
     public static void generateDungeon(ContextUtils.StructureContext structureContext) {
         ServerLevel world = structureContext.getLevel();
