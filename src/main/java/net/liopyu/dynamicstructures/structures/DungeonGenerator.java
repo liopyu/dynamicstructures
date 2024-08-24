@@ -1,5 +1,6 @@
 package net.liopyu.dynamicstructures.structures;
 
+import net.liopyu.dynamicstructures.DynamicStructures;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -33,8 +34,8 @@ public class DungeonGenerator {
     public static final EntityType<?>[] ENTITY_TYPES = {
             EntityType.ZOMBIE, EntityType.WITCH, EntityType.SKELETON, EntityType.CREEPER
     };
-
-    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height, int baseWidth, int baseLength, boolean generatesSpawners, int maxSpawners, List<EntityType<?>> potentialSpawns) {
+    protected static int defaultDoorwayRadius = 3;
+    public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random,float ladderRoomChance, int roomCount, int height, int baseWidth, int baseLength, boolean generatesSpawners, int maxSpawners, List<EntityType<?>> potentialSpawns) {
         Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
         Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
         Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
@@ -48,16 +49,16 @@ public class DungeonGenerator {
             int width = getRandomSize(baseWidth, random);
             int length = getRandomSize(baseLength, random);
 
-            boolean isLadderRoom = random.nextInt(10) < 2; // 20% chance for a ladder room
+            boolean isLadderRoom = random.nextInt(10) < ladderRoomChance; // 20% chance for a ladder room
 
             if (isLadderRoom) {
                 // Generate both lower and upper ladder rooms
                 generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true, currentDirection);
 
                 // Place doorways for both lower and upper rooms
-                placeDoorway(world, currentPos, width, length, currentDirection, random, 2);
+                placeDoorway(world, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 BlockPos upperRoomPos = currentPos.above(height);
-                placeDoorway(world, upperRoomPos, width, length, currentDirection, random, 2);
+                placeDoorway(world, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);
 
                 // Place spawners if configured
                 if (generatesSpawners) {
@@ -72,7 +73,7 @@ public class DungeonGenerator {
                 previousRoomWalls = currentRoomWalls;
 
                 // Place the doorway for the regular room
-                placeDoorway(world, currentPos, width, length, currentDirection, random, 2);
+                placeDoorway(world, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
 
                 // Place spawners if configured
                 if (generatesSpawners) {
@@ -87,29 +88,7 @@ public class DungeonGenerator {
             currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
         }
     }
-    private static void placeSpawners(ServerLevel world, BlockPos pos, int width, int length, int height, RandomSource random, int maxSpawners, List<EntityType<?>> potentialSpawns) {
-        int spawnersToPlace = random.nextInt(maxSpawners + 1); // Randomly decide how many spawners to place, up to maxSpawners
 
-        for (int i = 0; i < spawnersToPlace; i++) {
-            // Randomly pick a position within the room
-            int x = pos.getX() + random.nextInt(width);
-            int y = pos.getY() + 1; // Typically spawners are placed above the floor
-            int z = pos.getZ() + random.nextInt(length);
-
-            BlockPos spawnerPos = new BlockPos(x, y, z);
-
-            // Select a random entity type from the list
-            EntityType<?> entityType = potentialSpawns.get(random.nextInt(potentialSpawns.size()));
-
-            // Place the spawner block and set its entity type
-            world.setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3);
-
-            BlockEntity blockEntity = world.getBlockEntity(spawnerPos);
-            if (blockEntity instanceof SpawnerBlockEntity spawnerEntity) {
-                spawnerEntity.getSpawner().setEntityId(entityType,world,world.random,spawnerPos);
-            }
-        }
-    }
     public static void generateDungeon(ServerLevel world, BlockPos startPos, Direction startDirection, RandomSource random, int roomCount, int height, int baseWidth, int baseLength) {
         Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
         Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
@@ -131,9 +110,9 @@ public class DungeonGenerator {
                 generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true,currentDirection);
 
                 // Place doorways for both lower and upper rooms
-                placeDoorway(world, currentPos, width, length, currentDirection, random,2);
+                placeDoorway(world, currentPos, width, length, currentDirection, random,defaultDoorwayRadius);
                 BlockPos upperRoomPos = currentPos.above(height);
-                placeDoorway(world, upperRoomPos, width, length, currentDirection, random,2);
+                placeDoorway(world, upperRoomPos, width, length, currentDirection, random,defaultDoorwayRadius);
 
                 // Move to the next room position after the upper room
                 currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
@@ -142,7 +121,7 @@ public class DungeonGenerator {
                 previousRoomWalls = currentRoomWalls;
 
                 // Place the doorway for the regular room
-                placeDoorway(world, currentPos, width, length, currentDirection, random,2);
+                placeDoorway(world, currentPos, width, length, currentDirection, random,defaultDoorwayRadius);
 
                 // Move to the next room position
                 currentPos = calculateNextRoomPos(currentPos, width, length, currentDirection);
@@ -153,6 +132,29 @@ public class DungeonGenerator {
         }
     }
 
+    private static void placeSpawners(ServerLevel world, BlockPos pos, int width, int length, int height, RandomSource random, int maxSpawners, List<EntityType<?>> potentialSpawns) {
+        int spawnersToPlace = random.nextInt(maxSpawners + 1); // Randomly decide how many spawners to place, up to maxSpawners
+
+        for (int i = 0; i < spawnersToPlace; i++) {
+            // Randomly pick a position within the room
+            int x = pos.getX() + random.nextInt(width);
+            int y = pos.getY()+ random.nextInt(height);
+            int z = pos.getZ() + random.nextInt(length);
+
+            BlockPos spawnerPos = new BlockPos(x, y, z);
+
+            // Select a random entity type from the list
+            EntityType<?> entityType = potentialSpawns.get(random.nextInt(potentialSpawns.size()));
+
+            // Place the spawner block and set its entity type
+            world.setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3);
+
+            BlockEntity blockEntity = world.getBlockEntity(spawnerPos);
+            if (blockEntity instanceof SpawnerBlockEntity spawnerEntity) {
+                spawnerEntity.getSpawner().setEntityId(entityType,world,world.random,spawnerPos);
+            }
+        }
+    }
     private static int getRandomSize(int baseSize, RandomSource random) {
         // Calculate 30% of the base size
         int variation = (int) (baseSize * 0.3);
@@ -188,7 +190,7 @@ public class DungeonGenerator {
         // Ensure there's an opening at the top of the ladder into the new room
         BlockPos opening = ladderBase.above(height);
         world.setBlock(opening, Blocks.AIR.defaultBlockState(), 3); // Clear the entry point into the upper room
-        placeDoorway(world, basePos, width, length, currentDirection, world.random,2);
+        placeDoorway(world, basePos, width, length, currentDirection, world.random,defaultDoorwayRadius);
     }
 
     private static Set<BlockPos> generateLadderRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap) {
@@ -262,26 +264,32 @@ public class DungeonGenerator {
         }
     }
     private static void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
-        if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos).getBlock())||
-                world.getBlockState(pos).getBlock() instanceof LiquidBlock){
+        // Check if the block is suitable for wall placement
+        if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos).getBlock()) ||
+                world.getBlockState(pos).getBlock() instanceof LiquidBlock ||
+                world.getBlockState(pos).isAir()) {
+
             world.setBlock(pos, block.defaultBlockState(), 3);
             wallPositions.add(pos);
-        }
-        if (overlapWalls != null && overlapWalls.contains(pos)) {
-            if (forceOverlap) {
-                // Force overlap: Place the wall block even if it overlaps with an existing wall
-                world.setBlock(pos, block.defaultBlockState(), 3);
-                wallPositions.add(pos);
-            } else if (isSharedWall(pos, overlapWalls, world)) {
-                // If not forcing overlap, clear the position (place air) if it's a shared wall
-                world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        } else if (forceOverlap) {
+            // Force overlap: Place the wall block even if it overlaps with an existing wall
+            world.setBlock(pos, block.defaultBlockState(), 3);
+            wallPositions.add(pos);
+        } else if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
+            // If not forcing overlap, clear the position (place air) if it's a shared wall
+            world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        } else {
+            // Check adjacent blocks for double walls
+            for (Direction direction : Direction.values()) {
+                BlockPos adjacentPos = pos.relative(direction);
+                if (wallPositions.contains(adjacentPos)) {
+                    world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                    return; // Exit early after setting to air to prevent placing a block
+                }
             }
-        } else if (world.getBlockState(pos).isAir()) {
-            // Place the wall block normally if the position is not part of overlapWalls or it's air
-            world.setBlock(pos, block.defaultBlockState(), 3);
-            wallPositions.add(pos);
         }
     }
+
 
     private static void generateRoof(ServerLevel world, BlockPos pos, int width, int length, int height, Block roofBlock) {
         for (int x = 0; x < width; x++) {
@@ -311,11 +319,9 @@ public class DungeonGenerator {
     }
 
 
-    private static boolean isSharedWall(BlockPos pos, Set<BlockPos> overlapWalls, ServerLevel world) {
-        boolean horizontalContinuity = (overlapWalls.contains(pos.north()) && overlapWalls.contains(pos.south())) ||
+    private static boolean isSharedWall(BlockPos pos, Set<BlockPos> overlapWalls) {
+        return (overlapWalls.contains(pos.north()) && overlapWalls.contains(pos.south())) ||
                 (overlapWalls.contains(pos.east()) && overlapWalls.contains(pos.west()));
-
-        return horizontalContinuity;
     }
 
     private static void placeDoorway(ServerLevel world, BlockPos pos, int width, int length, Direction direction, RandomSource random,int radius) {
@@ -345,9 +351,12 @@ public class DungeonGenerator {
                         if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(outwardPos).getBlock())) {
                             return; // Skip placing the doorway if blocked by a roof block
                         }
-
-                        world.setBlock(doorPos, Blocks.AIR.defaultBlockState(), 3);
-                        world.setBlock(doorPosTop, Blocks.AIR.defaultBlockState(), 3);
+                        if (!world.getBlockState(doorPos).is(Blocks.LADDER)){
+                            world.setBlock(doorPos, Blocks.AIR.defaultBlockState(), 3);
+                        }
+                        if (!world.getBlockState(doorPosTop).is(Blocks.LADDER)){
+                            world.setBlock(doorPosTop, Blocks.AIR.defaultBlockState(), 3);
+                        }
                     }
                 }
             }

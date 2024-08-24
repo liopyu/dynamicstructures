@@ -36,10 +36,11 @@ public class ServerForgeEvents {
 
             //generateLadderRoom(serverLevel, blockPos, 10, 10, 10, Blocks.ACACIA_PLANKS, Blocks.BIRCH_WOOD, Blocks.STONE_SLAB, true);
             DungeonGenerator.generateDungeon(serverLevel, blockPos,direction, serverLevel.getRandom(),
+            10,
                     15,
                     8,
                     8,
-                    8,true,3, List.of(ENTITY_TYPES));
+                    8,true,1, List.of(ENTITY_TYPES));
         }
     }
 }
