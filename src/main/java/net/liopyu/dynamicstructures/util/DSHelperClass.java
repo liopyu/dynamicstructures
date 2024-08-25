@@ -2,11 +2,15 @@ package net.liopyu.dynamicstructures.util;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
+
+import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import static com.mojang.text2speech.Narrator.LOGGER;
+import static net.liopyu.dynamicstructures.data.StructureLoader.STRUCTURE_DIR;
+
 public class DSHelperClass {
     public static final Set<String> errorMessagesLogged = new HashSet<>();
     public static final Set<String> warningMessagesLogged = new HashSet<>();
@@ -126,5 +130,15 @@ public class DSHelperClass {
         } else {
             return null;
         }
+    }
+    public static String deriveStructureNameFromPath(String jsonFilePath) {
+        String relativePath = jsonFilePath.replace(STRUCTURE_DIR.getAbsolutePath(), "").replace(File.separator, "/");
+        if (relativePath.startsWith("/")) {
+            relativePath = relativePath.substring(1);
+        }
+        if (relativePath.endsWith(".json")) {
+            relativePath = relativePath.substring(0, relativePath.length() - 5);
+        }
+        return relativePath;
     }
 }

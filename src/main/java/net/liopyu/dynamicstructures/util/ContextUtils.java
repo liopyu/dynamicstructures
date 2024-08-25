@@ -32,7 +32,7 @@ public class ContextUtils {
         private static final int DEFAULT_SIZE_THRESHOLD = 30;
         private static final boolean DEFAULT_GENERATE_SPAWNERS = false;
         private static final int DEFAULT_MAX_SPAWNERS = 1;
-        private static final List<EntityType<?>> DEFAULT_SPAWNER_ENTITIES = List.of(EntityType.ZOMBIE, EntityType.CREEPER);
+        public static final List<EntityType<?>> DEFAULT_SPAWNER_ENTITIES = List.of(EntityType.ZOMBIE, EntityType.CREEPER);
         private final ServerLevel level;
         private final BlockPos startPos;
         private final Direction startDirection;
@@ -66,7 +66,7 @@ public class ContextUtils {
             if (json.has("Structure Name")) {
                 structureName = json.get("Structure Name").getAsString();
             } else {
-                structureName = deriveStructureNameFromPath(jsonFilePath);
+                structureName = DSHelperClass.deriveStructureNameFromPath(jsonFilePath);
                 DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to [" + structureName + "].");
             }
             float ladderChance = json.has("Ladder Chance") ? json.get("Ladder Chance").getAsFloat() : logDefault("Ladder Chance", DEFAULT_LADDER_CHANCE, jsonFilePath);
@@ -104,16 +104,7 @@ public class ContextUtils {
                     sizeThreshold
             );
         }
-        private static String deriveStructureNameFromPath(String jsonFilePath) {
-            String relativePath = jsonFilePath.replace(STRUCTURE_DIR.getAbsolutePath(), "").replace(File.separator, "/");
-            if (relativePath.startsWith("/")) {
-                relativePath = relativePath.substring(1);
-            }
-            if (relativePath.endsWith(".json")) {
-                relativePath = relativePath.substring(0, relativePath.length() - 5);
-            }
-            return relativePath;
-        }
+
         private static <T> T logDefault(String fieldName, T defaultValue, String jsonFilePath) {
             DSHelperClass.logWarningMessageOnce(fieldName + " is missing or null in " + jsonFilePath + ". Defaulting to [" + defaultValue + "].");
             return defaultValue;
@@ -169,26 +160,22 @@ public class ContextUtils {
     }
     public static class SpawnContext {
         private final String name;
-        private final ProtoChunk protoChunk;
-        private final ServerLevel level;
         private final long salt;
         private final int separation;
         private final int spacing;
 
-        public SpawnContext(String name, ProtoChunk protoChunk, ServerLevel level, long salt, int separation, int spacing) {
+        public SpawnContext(String name,long salt, int separation, int spacing) {
             this.name = name;
-            this.protoChunk = protoChunk;
-            this.level = level;
             this.salt = salt;
             this.separation = separation;
             this.spacing = spacing;
         }
-        public static SpawnContext fromJson(JsonObject json, ProtoChunk protoChunk,ServerLevel level,String jsonFilePath) {
+        public static SpawnContext fromJson(JsonObject json, String jsonFilePath) {
             String structureName;
             if (json.has("Structure Name")) {
                 structureName = json.get("Structure Name").getAsString();
             } else {
-                structureName = deriveStructureNameFromPath(jsonFilePath);
+                structureName = DSHelperClass.deriveStructureNameFromPath(jsonFilePath);
                 DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to [" + structureName + "].");
             }
             long salt = json.has("Salt") ? json.get("Salt").getAsLong() : logDefault("Salt", 1738452910, jsonFilePath);
@@ -197,22 +184,10 @@ public class ContextUtils {
 
             return new SpawnContext(
                     structureName,
-                    protoChunk,
-                    level,
                     salt,
                     separation,
                     spacing
             );
-        }
-        private static String deriveStructureNameFromPath(String jsonFilePath) {
-            String relativePath = jsonFilePath.replace(STRUCTURE_DIR.getAbsolutePath(), "").replace(File.separator, "/");
-            if (relativePath.startsWith("/")) {
-                relativePath = relativePath.substring(1);
-            }
-            if (relativePath.endsWith(".json")) {
-                relativePath = relativePath.substring(0, relativePath.length() - 5);
-            }
-            return relativePath;
         }
         private static <T> T logDefault(String fieldName, T defaultValue, String jsonFilePath) {
             DSHelperClass.logWarningMessageOnce(fieldName + " is missing or null in " + jsonFilePath + ". Defaulting to [" + defaultValue + "].");
@@ -223,13 +198,6 @@ public class ContextUtils {
             return name;
         }
 
-        public ProtoChunk getProtoChunk() {
-            return protoChunk;
-        }
-
-        public ServerLevel getLevel() {
-            return level;
-        }
 
         public long getSalt() {
             return salt;
