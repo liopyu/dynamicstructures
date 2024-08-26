@@ -15,35 +15,40 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class StructureLoader {
-
+    private static boolean structuresLoaded = false;
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structures/");
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    private static List<ContextUtils.StructureContext> cachedStructures = new ArrayList<>();
 
     public static List<ContextUtils.StructureContext> loadStructures(ServerLevel level, BlockPos blockPos) {
-        List<ContextUtils.StructureContext> structures = new ArrayList<>();
+        if (structuresLoaded) {
+            return cachedStructures;
+        }
 
         if (!STRUCTURE_DIR.exists()) {
             STRUCTURE_DIR.mkdirs();
         }
 
-        // Recursively load JSON files from the directory and its subdirectories
-        loadJsonFilesRecursively(STRUCTURE_DIR, structures, level, blockPos);
+        loadJsonFilesRecursively(STRUCTURE_DIR, cachedStructures, level, blockPos);
 
-        if (structures.isEmpty()) {
-            // No JSON files found, load default
-            loadDefaultStructure(level, structures, blockPos);
+        if (cachedStructures.isEmpty()) {
+            loadDefaultStructure(level, cachedStructures, blockPos);
         }
 
-        return structures;
+        structuresLoaded = true;
+        return cachedStructures;
+    }
+
+    public static void clearCache() {
+        cachedStructures.clear();
+        structuresLoaded = false;
     }
 
     private static void loadJsonFilesRecursively(File directory, List<ContextUtils.StructureContext> structures, ServerLevel level, BlockPos blockPos) {
         File[] files = directory.listFiles();
-
         if (files != null) {
             for (File file : files) {
                 if (file.isDirectory()) {
-                    // Recursively search subdirectories
                     loadJsonFilesRecursively(file, structures, level, blockPos);
                 } else if (file.isFile() && file.getName().endsWith(".json")) {
                     try (FileReader reader = new FileReader(file)) {
@@ -66,12 +71,10 @@ public class StructureLoader {
             if (!DEFAULT_STRUCTURE_FILE.exists()) {
                 createDefaultStructureFile();
             }
-
             try (FileReader reader = new FileReader(DEFAULT_STRUCTURE_FILE)) {
                 JsonElement jsonElement = JsonParser.parseReader(reader);
                 if (jsonElement.isJsonObject()) {
                     JsonObject jsonObject = jsonElement.getAsJsonObject();
-                    // Pass the default file path for logging
                     ContextUtils.StructureContext context = ContextUtils.StructureContext.fromJson(jsonObject, level, blockPos, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
                     structures.add(context);
                 }

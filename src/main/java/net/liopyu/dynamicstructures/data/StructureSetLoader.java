@@ -16,27 +16,35 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class StructureSetLoader {
+    private static boolean structuresLoaded = false;
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structure_set/");
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    private static List<ContextUtils.SpawnContext> cachedStructures = new ArrayList<>();
 
     public static List<ContextUtils.SpawnContext> loadStructures() {
-        List<ContextUtils.SpawnContext> structures = new ArrayList<>();
+        if (structuresLoaded) {
+            return cachedStructures;
+        }
 
         if (!STRUCTURE_DIR.exists()) {
             STRUCTURE_DIR.mkdirs();
         }
 
-        // Recursively load JSON files from the directory and its subdirectories
-        loadJsonFilesRecursively(STRUCTURE_DIR, structures);
+        loadJsonFilesRecursively(STRUCTURE_DIR, cachedStructures);
 
-        if (structures.isEmpty()) {
-            // No JSON files found, load default
-            loadDefaultStructure(structures);
+        if (cachedStructures.isEmpty()) {
+            loadDefaultStructure( cachedStructures);
         }
 
-        return structures;
+        structuresLoaded = true;
+        return cachedStructures;
+    }
+    public static void clearCache() {
+        cachedStructures.clear();
+        structuresLoaded = false;
     }
 
     private static void loadJsonFilesRecursively(File directory, List<ContextUtils.SpawnContext> structures) {
@@ -45,7 +53,6 @@ public class StructureSetLoader {
         if (files != null) {
             for (File file : files) {
                 if (file.isDirectory()) {
-                    // Recursively search subdirectories
                     loadJsonFilesRecursively(file, structures);
                 } else if (file.isFile() && file.getName().endsWith(".json")) {
                     try (FileReader reader = new FileReader(file)) {
@@ -73,7 +80,6 @@ public class StructureSetLoader {
                 JsonElement jsonElement = JsonParser.parseReader(reader);
                 if (jsonElement.isJsonObject()) {
                     JsonObject jsonObject = jsonElement.getAsJsonObject();
-                    // Pass the default file path for logging
                     ContextUtils.SpawnContext context = ContextUtils.SpawnContext.fromJson(jsonObject, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
                     structures.add(context);
                 }
@@ -84,24 +90,21 @@ public class StructureSetLoader {
     }
 
     private static void createDefaultStructureFile() {
-        /*try (FileWriter writer = new FileWriter(DEFAULT_STRUCTURE_FILE)) {
+        Random random = new Random();
+        int randomSalt = 1_000_000_000 + random.nextInt(1_000_000_000);
+
+        try (FileWriter writer = new FileWriter(DEFAULT_STRUCTURE_FILE)) {
             writer.write("{\n");
-            writer.write("    \"Structure Name\": \"example_structure\",\n");
-            writer.write("    \"Ladder Chance\": 10,\n");
-            writer.write("    \"Room Count\": 10,\n");
-            writer.write("    \"Height\": 6,\n");
-            writer.write("    \"Width\": 10,\n");
-            writer.write("    \"Length\": 10,\n");
-            writer.write("    \"Size Threshold\": 20,\n");
-            writer.write("    \"Generate Spawners\": true,\n");
-            writer.write("    \"Max Spawners\": 2,\n");
-            writer.write("    \"Spawner Entities\": [\n");
-            writer.write("        \"minecraft:zombie\",\n");
-            writer.write("        \"minecraft:skeleton\"\n");
-            writer.write("    ]\n");
+            writer.write("    \"Structure Name\": \"test\",\n");
+            writer.write("    \"Salt\": " + randomSalt + ",\n");
+            writer.write("    \"Separation\": 7,\n");
+            writer.write("    \"Spacing\": 8,\n");
+            writer.write("    \"y Min\": -32,\n");
+            writer.write("    \"y Max\": 0\n");
+            writer.write("    \"Max Distance\": 35,\n");
             writer.write("}\n");
         } catch (IOException e) {
             e.printStackTrace();
-        }*/
+        }
     }
 }

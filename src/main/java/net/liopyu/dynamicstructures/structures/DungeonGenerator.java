@@ -124,7 +124,7 @@ public class DungeonGenerator {
             }
         }
     }
-    private static int getRandomSize(int baseSize, RandomSource random, int sizeThreshold) {
+    public static int getRandomSize(int baseSize, RandomSource random, int sizeThreshold) {
         // Calculate variation based on the size threshold
         int variation = (int) (baseSize * (sizeThreshold / 100.0));
 

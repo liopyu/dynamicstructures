@@ -1,5 +1,7 @@
 package net.liopyu.dynamicstructures.util;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
 
@@ -131,8 +133,8 @@ public class DSHelperClass {
             return null;
         }
     }
-    public static String deriveStructureNameFromPath(String jsonFilePath) {
-        String relativePath = jsonFilePath.replace(STRUCTURE_DIR.getAbsolutePath(), "").replace(File.separator, "/");
+    public static String deriveStructureNameFromPath(String jsonFilePath,File file) {
+        String relativePath = jsonFilePath.replace(file.getAbsolutePath(), "").replace(File.separator, "/");
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
         }
@@ -140,5 +142,30 @@ public class DSHelperClass {
             relativePath = relativePath.substring(0, relativePath.length() - 5);
         }
         return relativePath;
+    }
+    public static <T> T logDefault(String fieldName, T defaultValue, String jsonFilePath) {
+        DSHelperClass.logWarningMessageOnce(fieldName + " is missing or null in " + jsonFilePath + ". Defaulting to [" + defaultValue + "].");
+        return defaultValue;
+    }
+    public static JsonObject normalizeJson(JsonObject json) {
+        JsonObject normalizedJson = new JsonObject();
+        json.entrySet().forEach(entry -> {
+            String key = entry.getKey().toLowerCase();
+            JsonElement element = entry.getValue();
+            if (element.isJsonPrimitive()) {
+                if (element.getAsJsonPrimitive().isString()) {
+                    normalizedJson.addProperty(key, element.getAsString());
+                } else if (element.getAsJsonPrimitive().isBoolean()) {
+                    normalizedJson.addProperty(key, element.getAsBoolean());
+                } else if (element.getAsJsonPrimitive().isNumber()) {
+                    normalizedJson.addProperty(key, element.getAsNumber());
+                }
+            } else if (element.isJsonArray()) {
+                normalizedJson.add(key, element.getAsJsonArray());
+            } else if (element.isJsonObject()) {
+                normalizedJson.add(key, element.getAsJsonObject());
+            }
+        });
+        return normalizedJson;
     }
 }
