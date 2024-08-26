@@ -11,38 +11,44 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static com.mojang.text2speech.Narrator.LOGGER;
-import static net.liopyu.dynamicstructures.data.StructureLoader.STRUCTURE_DIR;
 
 public class DSHelperClass {
     public static final Set<String> errorMessagesLogged = new HashSet<>();
     public static final Set<String> warningMessagesLogged = new HashSet<>();
+
     public static void logErrorMessageOnce(String errorMessage) {
         if (!errorMessagesLogged.contains(errorMessage)) {
             LOGGER.error(errorMessage);
             errorMessagesLogged.add(errorMessage);
         }
     }
+
     public static void logErrorMessage(String errorMessage) {
         LOGGER.error(errorMessage);
     }
+
     public static void logWarningMessageOnce(String errorMessage) {
         if (!warningMessagesLogged.contains(errorMessage)) {
             LOGGER.warn(errorMessage);
             warningMessagesLogged.add(errorMessage);
         }
     }
+
     public static void logErrorMessageCatchable(String errorMessage, Throwable e) {
         LOGGER.error(errorMessage, e);
     }
+
     public static void logErrorMessageOnceCatchable(String errorMessage, Throwable e) {
         if (!errorMessagesLogged.contains(errorMessage)) {
             LOGGER.error(errorMessage, e);
             errorMessagesLogged.add(errorMessage);
         }
     }
+
     public static void logInfoMessage(String info) {
-            LOGGER.info(info);
+        LOGGER.info(info);
     }
+
     public static <T> boolean consumerCallback(Consumer<T> consumer, T value, String errorMessage) {
         try {
             consumer.accept(value);
@@ -52,6 +58,7 @@ public class DSHelperClass {
         }
         return true;
     }
+
     public static Object convertObjectToDesired(Object input, String outputType) {
         return switch (outputType.toLowerCase()) {
             case "integer" -> convertToInteger(input);
@@ -63,6 +70,7 @@ public class DSHelperClass {
             default -> input;
         };
     }
+
     public static ResourceLocation convertToResourceLocation(Object input) {
         if (input instanceof ResourceLocation) {
             return (ResourceLocation) input;
@@ -106,6 +114,7 @@ public class DSHelperClass {
         }
         return null;
     }
+
     public static Integer convertToInteger(Object input) {
         if (input instanceof Integer) {
             return (Integer) input;
@@ -115,6 +124,7 @@ public class DSHelperClass {
             return null;
         }
     }
+
     public static Double convertToDouble(Object input) {
         if (input instanceof Double) {
             return (Double) input;
@@ -124,6 +134,7 @@ public class DSHelperClass {
             return null;
         }
     }
+
     public static Float convertToFloat(Object input) {
         if (input instanceof Float) {
             return (Float) input;
@@ -133,7 +144,8 @@ public class DSHelperClass {
             return null;
         }
     }
-    public static String deriveStructureNameFromPath(String jsonFilePath,File file) {
+
+    public static String deriveStructureNameFromPath(String jsonFilePath, File file) {
         String relativePath = jsonFilePath.replace(file.getAbsolutePath(), "").replace(File.separator, "/");
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
@@ -143,10 +155,12 @@ public class DSHelperClass {
         }
         return relativePath;
     }
+
     public static <T> T logDefault(String fieldName, T defaultValue, String jsonFilePath) {
         DSHelperClass.logWarningMessageOnce(fieldName + " is missing or null in " + jsonFilePath + ". Defaulting to [" + defaultValue + "].");
         return defaultValue;
     }
+
     public static JsonObject normalizeJson(JsonObject json) {
         JsonObject normalizedJson = new JsonObject();
         json.entrySet().forEach(entry -> {
@@ -168,4 +182,5 @@ public class DSHelperClass {
         });
         return normalizedJson;
     }
+
 }
