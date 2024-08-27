@@ -14,9 +14,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * The {@code StructureSetLoader} class is responsible for loading structure spawning configurations
@@ -41,8 +39,8 @@ import java.util.Random;
 public class StructureSetLoader {
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structure_set/");
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    public static Map<String, ContextUtils.SpawnContext> cachedStructures = new HashMap<>();
     private static boolean structuresLoaded = false;
-    private static List<ContextUtils.SpawnContext> cachedStructures = new ArrayList<>();
 
     /**
      * Loads structure spawn context configurations from the specified directory. If contexts have already
@@ -50,7 +48,7 @@ public class StructureSetLoader {
      *
      * @return A list of loaded {@link ContextUtils.SpawnContext} objects.
      */
-    public static List<ContextUtils.SpawnContext> loadStructures() {
+    public static Map<String, ContextUtils.SpawnContext> loadStructures() {
         if (structuresLoaded) {
             return cachedStructures;
         }
@@ -85,7 +83,7 @@ public class StructureSetLoader {
      * @param directory  The directory to scan for JSON files.
      * @param structures The list to store the loaded {@link ContextUtils.SpawnContext} objects.
      */
-    private static void loadJsonFilesRecursively(File directory, List<ContextUtils.SpawnContext> structures) {
+    private static void loadJsonFilesRecursively(File directory, Map<String, ContextUtils.SpawnContext> structures) {
         File[] files = directory.listFiles();
 
         if (files != null) {
@@ -98,7 +96,7 @@ public class StructureSetLoader {
                         if (jsonElement.isJsonObject()) {
                             JsonObject jsonObject = jsonElement.getAsJsonObject();
                             ContextUtils.SpawnContext context = ContextUtils.SpawnContext.fromJson(jsonObject, file.getAbsolutePath());
-                            structures.add(context);
+                            structures.put(context.getName(), context);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -114,7 +112,7 @@ public class StructureSetLoader {
      *
      * @param structures The list to store the loaded {@link ContextUtils.SpawnContext} objects.
      */
-    private static void loadDefaultStructure(List<ContextUtils.SpawnContext> structures) {
+    private static void loadDefaultStructure(Map<String, ContextUtils.SpawnContext> structures) {
         try {
             if (!DEFAULT_STRUCTURE_FILE.exists()) {
                 createDefaultStructureFile();
@@ -125,7 +123,7 @@ public class StructureSetLoader {
                 if (jsonElement.isJsonObject()) {
                     JsonObject jsonObject = jsonElement.getAsJsonObject();
                     ContextUtils.SpawnContext context = ContextUtils.SpawnContext.fromJson(jsonObject, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
-                    structures.add(context);
+                    structures.put(context.getName(), context);
                 }
             }
         } catch (IOException e) {

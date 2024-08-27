@@ -2,6 +2,7 @@ package net.liopyu.dynamicstructures.util;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.liopyu.dynamicstructures.DynamicStructures;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.minecraft.core.BlockPos;
@@ -17,7 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import static com.mojang.text2speech.Narrator.LOGGER;
+import static net.liopyu.dynamicstructures.DynamicStructures.LOGGER;
 
 /**
  * Utility class providing helper methods for logging warnings and normalizing JSON objects.
@@ -299,11 +300,9 @@ public class DSHelperClass {
      * @see DSHelperClass#logWarningMessage(String)
      */
     public static ContextUtils.SpawnContext getSpawnContext(String structureName) {
-        List<ContextUtils.SpawnContext> spawnContexts = StructureSetLoader.loadStructures();
-        for (ContextUtils.SpawnContext context : spawnContexts) {
-            if (structureName.equals(context.getName())) {
-                return context;
-            }
+        var map = StructureSetLoader.cachedStructures;
+        if (map.containsKey(structureName)) {
+            return map.get(structureName);
         }
         DSHelperClass.logWarningMessage("SpawnContext with name '" + structureName + "' not found.");
         return null;

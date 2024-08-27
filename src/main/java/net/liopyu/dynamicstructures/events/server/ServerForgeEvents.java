@@ -4,7 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import net.liopyu.dynamicstructures.commands.FindStructureCommand;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
-import net.liopyu.dynamicstructures.structures.DungeonGenerator;
+import net.liopyu.dynamicstructures.structures.Dungeon;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.commands.CommandSourceStack;
@@ -12,13 +12,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -118,10 +116,9 @@ public class ServerForgeEvents {
      */
     public static boolean performFirstTimeLoadActionBoolean(BlockPos pos, ServerLevel serverLevel) {
         Random random = new Random();
-        List<ContextUtils.SpawnContext> spawnContexts = StructureSetLoader.loadStructures();
         Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
         for (ContextUtils.StructureContext structureContext : structures.values()) {
-            ContextUtils.SpawnContext spawnContext = findSpawnContextForStructure(spawnContexts, structureContext.getStructureName());
+            ContextUtils.SpawnContext spawnContext = DSHelperClass.getSpawnContext(structureContext.getStructureName());
             if (spawnContext != null) {
                 int yMin = spawnContext.getyMin();
                 int yMax = spawnContext.getyMax();
@@ -132,7 +129,7 @@ public class ServerForgeEvents {
                     return true;
                 }
             } else {
-                DSHelperClass.logErrorMessageOnce("1. Spawning Context is null: " + serverLevel.getChunk(pos).getPos() + " for spawning context: " + spawnContext.getName() + " with structure context: " + structureContext.getStructureName());
+                DSHelperClass.logWarningMessageOnce("Spawning Context is null: " + serverLevel.getChunk(pos).getPos() + " for spawningContext: " + spawnContext.getName() + " with structureContext: " + structureContext.getStructureName());
                 return false;
             }
         }
@@ -145,29 +142,28 @@ public class ServerForgeEvents {
      * through them to determine which structures should be generated in the chunk.
      * <p>
      * For each structure context, it finds the corresponding spawn context and, if available,
-     * triggers the structure generation using {@link DungeonGenerator#generateDungeon(ContextUtils.StructureContext, ServerLevel)}.
+     * triggers the structure generation using {@link Dungeon#generateDungeon}.
      * <p>
      * Logs informative messages to indicate whether a structure is successfully spawned or if
      * the corresponding spawn context is missing.
      *
      * @param chunk The chunk in which the structure generation is to be performed.
      * @param level The server level where the chunk is located.
-     * @see DungeonGenerator#generateDungeon(ContextUtils.StructureContext, ServerLevel)
+     * @see Dungeon#generateDungeon
      * @see ContextUtils.SpawnContext
      * @see ContextUtils.StructureContext
      */
     private static void performFirstTimeLoadAction(ChunkAccess chunk, ServerLevel level) {
-        List<ContextUtils.SpawnContext> spawnContexts = StructureSetLoader.loadStructures();
         Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
         for (ContextUtils.StructureContext structureContext : structures.values()) {
-            ContextUtils.SpawnContext spawnContext = findSpawnContextForStructure(spawnContexts, structureContext.getStructureName());
+            ContextUtils.SpawnContext spawnContext = DSHelperClass.getSpawnContext(structureContext.getStructureName());
             if (spawnContext != null) {
                 if (!FMLEnvironment.production) {
                     DSHelperClass.logInfoMessageOnce("Spawning structure: " + chunk.getPos());
                 }
-                DungeonGenerator.generateDungeon(structureContext, level);
+                new Dungeon(structureContext, level).generateDungeon();
             } else {
-                DSHelperClass.logErrorMessageOnce("2. Spawning Context is null: " + chunk.getPos() + " for structure: " + structureContext.getStructureName() + " for spawn context: " + structureContext.getStructureName());
+                DSHelperClass.logWarningMessageOnce(" Spawning Context is null: " + chunk.getPos() + " for structureContext: " + structureContext.getStructureName() + " for spawnContext: " + structureContext.getStructureName());
             }
         }
     }
@@ -225,7 +221,7 @@ public class ServerForgeEvents {
      * @param pos              The world position being evaluated for structure placement.
      * @return {@code true} if the structure should be generated in the chunk; {@code false} otherwise.
      * @see #getMaxSize(int, int)
-     * @see DungeonGenerator#getRandomSize(int, net.minecraft.util.RandomSource, int)
+     * @see Dungeon#getRandomSize(int, net.minecraft.util.RandomSource, int)
      */
     public static boolean shouldGenerateStructure(ContextUtils.StructureContext structureContext, ContextUtils.SpawnContext spawnContext, ChunkPos chunkPos, ServerLevel level, BlockPos pos) {
         int width = getMaxSize(structureContext.getWidth(), structureContext.getSizeThreshold()) + 5;
@@ -374,9 +370,7 @@ public class ServerForgeEvents {
     }
 
     @SubscribeEvent
-    public static void onServerStarting(RegisterCommandsEvent event) {
-        StructureSetLoader.loadStructures();
-        StructureLoader.loadStructures();
+    public static void onCommandRegistry(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         FindStructureCommand.register(dispatcher);
     }

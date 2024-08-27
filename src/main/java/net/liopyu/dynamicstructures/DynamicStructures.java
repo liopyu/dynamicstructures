@@ -3,6 +3,8 @@ package net.liopyu.dynamicstructures;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.logging.LogUtils;
 import net.liopyu.dynamicstructures.commands.FindStructureCommand;
+import net.liopyu.dynamicstructures.data.StructureLoader;
+import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Registry;
@@ -39,8 +41,9 @@ public class DynamicStructures {
     public DynamicStructures() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
+        StructureSetLoader.loadStructures();
+        StructureLoader.loadStructures();
         modEventBus.addListener(this::commonSetup);
-        //CREATIVE_MODE_TABS.register(modEventBus);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 

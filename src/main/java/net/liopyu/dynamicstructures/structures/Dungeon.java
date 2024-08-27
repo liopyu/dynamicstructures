@@ -20,7 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class DungeonGenerator {
+public class Dungeon {
     private static final Block[] WALL_BLOCKS = {
             Blocks.OAK_PLANKS, Blocks.STONE_BRICKS, Blocks.BRICKS, Blocks.COBBLESTONE
     };
@@ -33,86 +33,20 @@ public class DungeonGenerator {
             Blocks.OAK_SLAB, Blocks.STONE_SLAB, Blocks.BRICK_SLAB, Blocks.COBBLESTONE_SLAB
     };
     protected static int defaultDoorwayRadius = 3;
+    public final ContextUtils.StructureContext structureContext;
+    public final ServerLevel level;
 
     /**
-     * Generates a complex dungeon structure within the world, consisting of multiple interconnected rooms.
-     * The dungeon is dynamically generated based on the parameters provided in the {@link ContextUtils.StructureContext}.
+     * Constructs a new {@code Dungeon} instance with the given {@link ContextUtils.StructureContext} and {@link ServerLevel}.
+     * The structure context provides the configuration details for the dungeon, while the server level specifies the world
+     * in which the dungeon will be generated.
      *
-     * <p>The dungeon generation process includes the following key features:
-     * <ul>
-     *   <li>Rooms of varying sizes, determined randomly within specified size thresholds.</li>
-     *   <li>Ladder rooms, which are vertical connections between two stacked rooms.</li>
-     *   <li>Optional mob spawners placed randomly within rooms, spawning entities from a specified list.</li>
-     *   <li>Interconnected rooms with doorways, randomly oriented to create a labyrinthine structure.</li>
-     * </ul>
-     *
-     * <p>The dungeon is generated as follows:
-     * <ol>
-     *   <li>The method begins at a specified starting position and direction within the world.</li>
-     *   <li>For each room (up to the specified room count), the method determines the room's dimensions randomly, based on base dimensions and a size threshold.</li>
-     *   <li>Rooms are either regular rooms or ladder rooms, with a chance for a ladder room determined by the {@code ladderRoomChance} parameter.</li>
-     *   <li>If a ladder room is generated, two stacked rooms are created, connected by a ladder. Doorways are added to both rooms, and spawners may be placed if enabled.</li>
-     *   <li>If a regular room is generated, the room is built with walls, a floor, and optionally a roof. A doorway is added, and spawners may be placed if enabled.</li>
-     *   <li>After each room is generated, the position and direction for the next room are calculated, potentially changing direction randomly.</li>
-     *   <li>This process repeats until the specified number of rooms has been generated.</li>
-     * </ol>
-     *
-     * <p>This method utilizes several helper methods:
-     * <ul>
-     *   <li>{@link #generateRoom(ServerLevel, BlockPos, int, int, int, Block, Block, Block, Set, boolean, boolean)} to create individual rooms.</li>
-     *   <li>{@link #generateLadderRoom(ServerLevel, BlockPos, int, int, int, Block, Block, Block, boolean, Direction)} to create ladder rooms.</li>
-     *   <li>{@link #placeSpawners(ServerLevel, BlockPos, int, int, int, RandomSource, int, List)} to place spawners within rooms.</li>
-     *   <li>{@link #placeDoorway(ServerLevel, BlockPos, int, int, Direction, RandomSource, int)} to create doorways connecting rooms.</li>
-     *   <li>{@link #calculateNextRoomPos(BlockPos, int, int, Direction)} to determine the position of the next room based on the current direction.</li>
-     *   <li>{@link #getRandomSize(int, RandomSource, int)} to calculate the random dimensions of each room.</li>
-     * </ul>
-     *
-     * @param structureContext The {@link ContextUtils.StructureContext} containing the configuration and parameters for the dungeon generation. This includes the starting position, room count, room dimensions, and other settings.
+     * @param structureContext The {@link ContextUtils.StructureContext} containing the configuration details of the dungeon.
+     * @param level            The {@link ServerLevel} in which the dungeon will be generated.
      */
-    public static void generateDungeon(ContextUtils.StructureContext structureContext, ServerLevel world) {
-        BlockPos startPos = structureContext.getStartPos();
-        Direction startDirection = structureContext.getStartDirection();
-        RandomSource random = world.getRandom();
-        float ladderRoomChance = structureContext.getLadderRoomChance();
-        int roomCount = structureContext.getRoomCount();
-        int height = structureContext.getHeight();
-        int baseWidth = structureContext.getWidth();
-        int baseLength = structureContext.getLength();
-        int sizeThreshold = structureContext.getSizeThreshold();
-        boolean generatesSpawners = structureContext.isGeneratesSpawners();
-        int maxSpawners = structureContext.getMaxSpawners();
-        List<EntityType<?>> potentialSpawns = structureContext.getPotentialSpawns();
-        Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
-        Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
-        Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
-        Set<BlockPos> previousRoomWalls = null;
-        BlockPos currentPos = startPos;
-        Direction currentDirection = startDirection;
-        for (int i = 0; i < roomCount; i++) {
-            int width = getRandomSize(baseWidth, random, sizeThreshold);
-            int length = getRandomSize(baseLength, random, sizeThreshold);
-            boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
-            if (isLadderRoom) {
-                generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true, currentDirection);
-                placeDoorway(world, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
-                BlockPos upperRoomPos = currentPos.above(height);
-                placeDoorway(world, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);
-                if (generatesSpawners) {
-                    placeSpawners(world, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
-                    placeSpawners(world, upperRoomPos, width, length, height, random, maxSpawners, potentialSpawns);
-                }
-                currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
-            } else {
-                Set<BlockPos> currentRoomWalls = generateRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
-                previousRoomWalls = currentRoomWalls;
-                placeDoorway(world, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
-                if (generatesSpawners) {
-                    placeSpawners(world, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
-                }
-                currentPos = calculateNextRoomPos(currentPos, width, length, currentDirection);
-            }
-            currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
-        }
+    public Dungeon(ContextUtils.StructureContext structureContext, ServerLevel level) {
+        this.structureContext = structureContext;
+        this.level = level;
     }
 
     /**
@@ -397,7 +331,7 @@ public class DungeonGenerator {
     /**
      * Places a single doorway at the specified position in the world, creating an opening in the given {@link Direction}.
      * The method adjusts the position of the doorway based on the room's {@code width} and {@code length} and the specified {@code doorRadius}.
-     * Doorways are created by clearing blocks within the specified radius, ensuring that the doorway is not obstructed by blocks such as {@link DungeonGenerator#ROOF_BLOCKS Roof Blocks}.
+     * Doorways are created by clearing blocks within the specified radius, ensuring that the doorway is not obstructed by blocks such as {@link Dungeon#ROOF_BLOCKS Roof Blocks}.
      *
      * @param world      The {@link ServerLevel} where the doorway should be placed.
      * @param pos        The starting {@link BlockPos position} of the room where the doorway will be created.
@@ -485,4 +419,90 @@ public class DungeonGenerator {
     private static Block selectRandomBlock(Block[] blocks, RandomSource random) {
         return blocks[random.nextInt(blocks.length)];
     }
+
+    /**
+     * Returns the {@link ContextUtils.StructureContext} associated with this dungeon.
+     * The structure context contains the configuration and parameters used to generate the dungeon.
+     *
+     * @return The {@link ContextUtils.StructureContext} associated with this dungeon.
+     */
+    public ContextUtils.StructureContext getStructureContext() {
+        return structureContext;
+    }
+
+    /**
+     * Returns the {@link ServerLevel} in which this dungeon is being generated.
+     * The server level represents the world or dimension where the dungeon will appear.
+     *
+     * @return The {@link ServerLevel} in which this dungeon is being generated.
+     */
+    public ServerLevel getLevel() {
+        return level;
+    }
+
+    /**
+     * Generates the dungeon in the specified {@link ServerLevel} based on the configuration provided
+     * in the {@link ContextUtils.StructureContext}. This method creates multiple rooms connected by doorways,
+     * potentially including ladder rooms and spawners, with randomized room sizes and directions.
+     * <p>
+     * The dungeon is generated procedurally, starting from the initial position and direction specified in the structure context.
+     * Rooms are created with varying widths, lengths, and heights, with the option to include spawners based on the configuration.
+     * Doorways are placed between rooms to connect them, and ladder rooms are generated based on the configured chance.
+     * <p>
+     * The dungeon generation process follows these steps:
+     * <ul>
+     *     <li>Selects random blocks for walls, floors, and roofs.</li>
+     *     <li>Determines the size and type of each room (normal or ladder room) based on random factors.</li>
+     *     <li>Generates rooms with walls, floors, roofs, and optionally spawners.</li>
+     *     <li>Places doorways between rooms and calculates the position of the next room.</li>
+     *     <li>Continues the process until all rooms are generated.</li>
+     * </ul>
+     */
+    public void generateDungeon() {
+        BlockPos startPos = structureContext.getStartPos();
+        Direction startDirection = structureContext.getStartDirection();
+        RandomSource random = level.getRandom();
+        float ladderRoomChance = structureContext.getLadderRoomChance();
+        int roomCount = structureContext.getRoomCount();
+        int height = structureContext.getHeight();
+        int baseWidth = structureContext.getWidth();
+        int baseLength = structureContext.getLength();
+        int sizeThreshold = structureContext.getSizeThreshold();
+        boolean generatesSpawners = structureContext.isGeneratesSpawners();
+        int maxSpawners = structureContext.getMaxSpawners();
+        List<EntityType<?>> potentialSpawns = structureContext.getPotentialSpawns();
+        Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
+        Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
+        Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
+        Set<BlockPos> previousRoomWalls = null;
+        BlockPos currentPos = startPos;
+        Direction currentDirection = startDirection;
+        for (int i = 0; i < roomCount; i++) {
+            int width = getRandomSize(baseWidth, random, sizeThreshold);
+            int length = getRandomSize(baseLength, random, sizeThreshold);
+            boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
+            if (isLadderRoom) {
+                generateLadderRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true, currentDirection);
+                placeDoorway(level, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
+                BlockPos upperRoomPos = currentPos.above(height);
+                placeDoorway(level, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);
+                if (generatesSpawners) {
+                    placeSpawners(level, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
+                    placeSpawners(level, upperRoomPos, width, length, height, random, maxSpawners, potentialSpawns);
+                }
+                currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
+            } else {
+                Set<BlockPos> currentRoomWalls = generateRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
+                previousRoomWalls = currentRoomWalls;
+                placeDoorway(level, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
+                if (generatesSpawners) {
+                    placeSpawners(level, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
+                }
+                currentPos = calculateNextRoomPos(currentPos, width, length, currentDirection);
+            }
+            currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
+        }
+    }
+
+
 }
