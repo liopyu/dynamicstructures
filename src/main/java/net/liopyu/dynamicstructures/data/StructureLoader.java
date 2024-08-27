@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.liopyu.dynamicstructures.util.ContextUtils;
+import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.BlockPos;
 
@@ -78,13 +79,16 @@ public class StructureLoader {
     }
 
     /**
-     * Recursively loads JSON files from the specified directory and converts them into
-     * {@link ContextUtils.StructureContext} objects.
+     * Recursively loads JSON files from the specified directory, parses them into
+     * {@link ContextUtils.StructureContext} objects, and adds them to the provided list.
+     * If a structure with the same name has already been registered, it logs an error
+     * and skips adding the duplicate structure.
      *
-     * @param directory  The directory to scan for JSON files.
-     * @param structures The list to store the loaded {@link ContextUtils.StructureContext} objects.
-     * @param level      The {@link ServerLevel} where the structures will be used.
-     * @param blockPos   The starting position of the structure in the world.
+     * @param directory  The directory to search for JSON files.
+     * @param structures The list where the parsed {@link ContextUtils.StructureContext}
+     *                   objects will be added.
+     * @param level      The {@link ServerLevel} instance used for loading structures.
+     * @param blockPos   The starting {@link BlockPos} used for structure placement.
      */
     private static void loadJsonFilesRecursively(File directory, List<ContextUtils.StructureContext> structures, ServerLevel level, BlockPos blockPos) {
         File[] files = directory.listFiles();
@@ -97,8 +101,14 @@ public class StructureLoader {
                         JsonElement jsonElement = JsonParser.parseReader(reader);
                         if (jsonElement.isJsonObject()) {
                             JsonObject jsonObject = jsonElement.getAsJsonObject();
-                            ContextUtils.StructureContext context = ContextUtils.StructureContext.fromJson(jsonObject, level, blockPos, file.getAbsolutePath());
-                            structures.add(context);
+                            ContextUtils.StructureContext newContext = ContextUtils.StructureContext.fromJson(jsonObject, level, blockPos, file.getAbsolutePath());
+                            boolean alreadyExists = structures.stream()
+                                    .anyMatch(existingContext -> existingContext.getStructureName().equals(newContext.getStructureName()));
+                            if (alreadyExists) {
+                                DSHelperClass.logErrorMessage("Structure '" + newContext.getStructureName() + "' is already registered. Skipping duplicate entry in file: " + file.getAbsolutePath());
+                            } else {
+                                structures.add(newContext);
+                            }
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -107,6 +117,7 @@ public class StructureLoader {
             }
         }
     }
+
 
     /**
      * Loads a default structure configuration if no other structures are found.

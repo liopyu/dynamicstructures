@@ -1,7 +1,10 @@
 package net.liopyu.dynamicstructures;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.logging.LogUtils;
+import net.liopyu.dynamicstructures.commands.FindStructureCommand;
 import net.liopyu.dynamicstructures.util.ContextUtils;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -16,6 +19,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.AddReloadListenerEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -39,8 +43,9 @@ public class DynamicStructures {
         //CREATIVE_MODE_TABS.register(modEventBus);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
+
+
     @SubscribeEvent
     public void commonSetup(final FMLCommonSetupEvent event) {
     }
-
 }

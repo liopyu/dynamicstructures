@@ -1,10 +1,13 @@
 package net.liopyu.dynamicstructures.events.server;
 
+import com.mojang.brigadier.CommandDispatcher;
+import net.liopyu.dynamicstructures.commands.FindStructureCommand;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.structures.DungeonGenerator;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -13,6 +16,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -300,14 +304,11 @@ public class ServerForgeEvents {
     }
 
     /**
-     * Searches for the nearest structure that matches a given name within a maximum distance of 100,000 blocks
-     * from a specified central position. The method compares the provided structure name against both
-     * {@link ContextUtils.StructureContext#getStructureName()} and {@link ContextUtils.SpawnContext#getName()},
-     * and checks if the structure is eligible to generate in each chunk within the search area.
+     * Finds and returns the position of the nearest structure that matches a given name.
      *
-     * <p>The search iterates over chunk positions, expanding outward from the central position, and
-     * identifies the closest matching structure that can be generated. If a structure is found within
-     * the search limits, its position is returned; otherwise, an empty result is provided.</p>
+     * <p>This method searches for the nearest structure matching the specified name by iterating over the world
+     * in chunk-sized steps. The search continues until the first valid structure is found, at which point the search
+     * stops and the position of that structure is returned. If no structure is found, an empty {@link Optional} is returned.</p>
      *
      * @param structureName    The name of the structure to search for.
      * @param structureContext The context containing details about the structure to generate.
@@ -320,25 +321,23 @@ public class ServerForgeEvents {
      * @see #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)
      */
     public static Optional<BlockPos> findNearestStructure(String structureName, ContextUtils.StructureContext structureContext, ContextUtils.SpawnContext spawnContext, ServerLevel level, BlockPos searchPos) {
-        BlockPos nearestPos = null;
-        double nearestDistance = Double.MAX_VALUE;
-        final int maxDistance = 100000;
-        for (int x = searchPos.getX() - maxDistance; x <= searchPos.getX() + maxDistance; x += 16) {
-            for (int z = searchPos.getZ() - maxDistance; z <= searchPos.getZ() + maxDistance; z += 16) {
-                ChunkPos chunkPos = new ChunkPos(new BlockPos(x, 0, z));
-                if (structureName.equals(structureContext.getStructureName()) || structureName.equals(spawnContext.getName())) {
-                    BlockPos dummyPos = chunkPos.getWorldPosition();
-                    if (shouldGenerateStructure(structureContext, spawnContext, chunkPos, level, dummyPos)) {
-                        double distance = searchPos.distSqr(dummyPos);
-                        if (distance < nearestDistance && distance <= maxDistance * maxDistance) {
-                            nearestDistance = distance;
-                            nearestPos = dummyPos;
+        int radius = 0;
+
+        while (true) {
+            radius++;
+            for (int x = -radius; x <= radius; x++) {
+                for (int z = -radius; z <= radius; z++) {
+                    ChunkPos chunkPos = new ChunkPos(searchPos.offset(x * 16, 0, z * 16));
+                    if (structureName.equals(structureContext.getStructureName()) || structureName.equals(spawnContext.getName())) {
+                        BlockPos dummyPos = chunkPos.getWorldPosition();
+                        if (radius > 10000) return Optional.empty();
+                        if (shouldGenerateStructure(structureContext, spawnContext, chunkPos, level, dummyPos)) {
+                            return Optional.of(dummyPos);
                         }
                     }
                 }
             }
         }
-        return Optional.ofNullable(nearestPos);
     }
 
 
@@ -355,13 +354,21 @@ public class ServerForgeEvents {
             var serverLevel = (ServerLevel) event.getLevel();
             var structureContext = DSHelperClass.getStructureContext("test", serverLevel, blockPos);
             var spawnContext = DSHelperClass.getSpawnContext("test");
-            findPotentialStructurePositions(structureContext,
+            var list = findPotentialStructurePositions(structureContext,
                     spawnContext,
                     serverLevel.getChunk(blockPos).getPos(),
                     serverLevel,
-                    100
+                    10
             );
-
+            var nearestStructurePos = findNearestStructure("test", structureContext, spawnContext, serverLevel, blockPos);
+            DSHelperClass.logInfoMessage(nearestStructurePos.get().toString());
+            //list.forEach(position -> DSHelperClass.logInfoMessage(position.toString()));
         }
+    }
+
+    @SubscribeEvent
+    public static void onServerStarting(RegisterCommandsEvent event) {
+        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        FindStructureCommand.register(dispatcher);
     }
 }

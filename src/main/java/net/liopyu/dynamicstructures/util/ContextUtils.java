@@ -100,7 +100,7 @@ public class ContextUtils {
             String structureName = normalizedJson.has("structure name") ? normalizedJson.get("structure name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureLoader.STRUCTURE_DIR);
             if (!normalizedJson.has("structure name")) {
-                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to [" + structureName + "].");
+                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to `" + structureName + "'.");
             }
             float ladderChance = normalizedJson.has("ladder chance") ? normalizedJson.get("ladder chance").getAsFloat() : DSHelperClass.logDefault("Ladder Chance", DEFAULT_LADDER_CHANCE, jsonFilePath);
             int roomCount = normalizedJson.has("room count") ? normalizedJson.get("room count").getAsInt() : DSHelperClass.logDefault("Room Count", DEFAULT_ROOM_COUNT, jsonFilePath);
@@ -328,7 +328,7 @@ public class ContextUtils {
             String structureName = normalizedJson.has("structure name") ? normalizedJson.get("structure name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureSetLoader.STRUCTURE_DIR);
             if (!normalizedJson.has("structure name")) {
-                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to [" + structureName + "].");
+                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to '" + structureName + "'.");
             }
             long salt = normalizedJson.has("salt") ? normalizedJson.get("salt").getAsLong() : DSHelperClass.logDefault("Salt", DEFAULT_SALT, jsonFilePath);
             int separation = normalizedJson.has("separation") ? normalizedJson.get("separation").getAsInt() : DSHelperClass.logDefault("Separation", DEFAULT_SEPARATION, jsonFilePath);
