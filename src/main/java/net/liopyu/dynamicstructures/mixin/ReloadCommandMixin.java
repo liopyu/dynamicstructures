@@ -2,6 +2,7 @@ package net.liopyu.dynamicstructures.mixin;
 
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
+import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.commands.ReloadCommand;
 import org.spongepowered.asm.mixin.Mixin;
@@ -43,5 +44,8 @@ public class ReloadCommandMixin {
     private static void onReload(Collection<String> p_138236_, CommandSourceStack p_138237_, CallbackInfo ci) {
         StructureLoader.clearCache();
         StructureSetLoader.clearCache();
+        DSHelperClass.errorMessagesLogged.clear();
+        DSHelperClass.warningMessagesLogged.clear();
+        DSHelperClass.infoMessagesLogged.clear();
     }
 }

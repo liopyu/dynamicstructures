@@ -2,12 +2,17 @@ package net.liopyu.dynamicstructures.util;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.liopyu.dynamicstructures.data.StructureLoader;
+import net.liopyu.dynamicstructures.data.StructureSetLoader;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
 import java.io.File;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -21,38 +26,50 @@ import static com.mojang.text2speech.Narrator.LOGGER;
 public class DSHelperClass {
     public static final Set<String> errorMessagesLogged = new HashSet<>();
     public static final Set<String> warningMessagesLogged = new HashSet<>();
+    public static final Set<String> infoMessagesLogged = new HashSet<>();
 
     public static void logErrorMessageOnce(String errorMessage) {
-        if (!errorMessagesLogged.contains("[Dynamic Structures]: " + errorMessage)) {
+        if (!errorMessagesLogged.contains(errorMessage)) {
             LOGGER.error("[Dynamic Structures]: " + errorMessage);
             errorMessagesLogged.add(errorMessage);
         }
     }
 
     public static void logErrorMessage(String errorMessage) {
-        LOGGER.error(errorMessage);
+        LOGGER.error("[Dynamic Structures]: " + errorMessage);
     }
 
     public static void logWarningMessageOnce(String errorMessage) {
-        if (!warningMessagesLogged.contains("[Dynamic Structures]: " + errorMessage)) {
+        if (!warningMessagesLogged.contains(errorMessage)) {
             LOGGER.warn("[Dynamic Structures]: " + errorMessage);
             warningMessagesLogged.add(errorMessage);
         }
     }
 
+    public static void logWarningMessage(String errorMessage) {
+        LOGGER.warn("[Dynamic Structures]: " + errorMessage);
+    }
+
     public static void logErrorMessageCatchable(String errorMessage, Throwable e) {
-        LOGGER.error(errorMessage, e);
+        LOGGER.error("[Dynamic Structures]: " + errorMessage, e);
     }
 
     public static void logErrorMessageOnceCatchable(String errorMessage, Throwable e) {
-        if (!errorMessagesLogged.contains("[Dynamic Structures]: " + errorMessage)) {
+        if (!errorMessagesLogged.contains(errorMessage)) {
             LOGGER.error("[Dynamic Structures]: " + errorMessage, e);
             errorMessagesLogged.add(errorMessage);
         }
     }
 
+    public static void logInfoMessageOnce(String info) {
+        if (!infoMessagesLogged.contains(info)) {
+            LOGGER.info("[Dynamic Structures]: " + info);
+            infoMessagesLogged.add(info);
+        }
+    }
+
     public static void logInfoMessage(String info) {
-        LOGGER.info(info);
+        LOGGER.info("[Dynamic Structures]: " + info);
     }
 
     public static <T> boolean consumerCallback(Consumer<T> consumer, T value, String errorMessage) {
@@ -266,4 +283,56 @@ public class DSHelperClass {
         }
     }
 
+    /**
+     * Retrieves the {@link ContextUtils.SpawnContext} corresponding to the specified structure name.
+     *
+     * <p>This method searches through the loaded spawn contexts to find a match for the given
+     * structure name. If a match is found, the corresponding {@link ContextUtils.SpawnContext}
+     * is returned. If no match is found, a warning is logged, and {@code null} is returned.</p>
+     *
+     * @param structureName The name of the structure to find the corresponding {@link ContextUtils.SpawnContext}.
+     * @return The {@link ContextUtils.SpawnContext} corresponding to the given structure name,
+     * or {@code null} if no match is found.
+     * @see ContextUtils.SpawnContext
+     * @see StructureSetLoader#loadStructures()
+     * @see DSHelperClass#logWarningMessage(String)
+     */
+    public static ContextUtils.SpawnContext getSpawnContext(String structureName) {
+        List<ContextUtils.SpawnContext> spawnContexts = StructureSetLoader.loadStructures();
+        for (ContextUtils.SpawnContext context : spawnContexts) {
+            if (structureName.equals(context.getName())) {
+                return context;
+            }
+        }
+        DSHelperClass.logWarningMessage("SpawnContext with name '" + structureName + "' not found.");
+        return null;
+    }
+
+    /**
+     * Retrieves the {@link ContextUtils.StructureContext} corresponding to the specified structure name.
+     *
+     * <p>This method searches through the loaded structure contexts to find a match for the given
+     * structure name in the specified {@link ServerLevel}. If a match is found, the corresponding
+     * {@link ContextUtils.StructureContext} is returned. If no match is found, a warning is logged,
+     * and {@code null} is returned.</p>
+     *
+     * @param structureName The name of the structure to find the corresponding {@link ContextUtils.StructureContext}.
+     * @param level         The {@link ServerLevel} in which to search for the structure.
+     * @param blockPos      The {@link BlockPos} position used for loading structure contexts.
+     * @return The {@link ContextUtils.StructureContext} corresponding to the given structure name,
+     * or {@code null} if no match is found.
+     * @see ContextUtils.StructureContext
+     * @see StructureLoader#loadStructures(ServerLevel, BlockPos)
+     * @see DSHelperClass#logWarningMessage(String)
+     */
+    public static ContextUtils.StructureContext getStructureContext(String structureName, ServerLevel level, BlockPos blockPos) {
+        List<ContextUtils.StructureContext> structures = StructureLoader.loadStructures(level, blockPos);
+        for (ContextUtils.StructureContext context : structures) {
+            if (structureName.equals(context.getStructureName())) {
+                return context;
+            }
+        }
+        DSHelperClass.logWarningMessage("StructureContext with name '" + structureName + "' not found.");
+        return null;
+    }
 }

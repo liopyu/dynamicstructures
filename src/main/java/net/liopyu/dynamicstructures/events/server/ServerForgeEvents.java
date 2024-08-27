@@ -15,14 +15,12 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.loading.FMLEnvironment;
-import net.minecraftforge.forgespi.Environment;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
 
 import static net.liopyu.dynamicstructures.DynamicStructures.MODID;
 
@@ -56,7 +54,6 @@ public class ServerForgeEvents {
                 BlockPos pos = event.getChunk().getPos().getWorldPosition();
                 if (serverLevel != null) {
                     performIfLoaded(serverLevel, pos, () -> {
-                        DSHelperClass.logInfoMessage("Attempting to perform operation2");
                         performFirstTimeLoadAction(serverLevel.getChunk(pos), serverLevel);
                     });
                 } else {
@@ -158,7 +155,9 @@ public class ServerForgeEvents {
         for (ContextUtils.StructureContext structureContext : structures) {
             ContextUtils.SpawnContext spawnContext = findSpawnContextForStructure(spawnContexts, structureContext.getStructureName());
             if (spawnContext != null) {
-                DSHelperClass.logInfoMessage("Spawning structure: " + chunk.getPos());
+                if (!FMLEnvironment.production) {
+                    DSHelperClass.logInfoMessageOnce("Spawning structure: " + chunk.getPos());
+                }
                 DungeonGenerator.generateDungeon(structureContext);
             } else {
                 DSHelperClass.logInfoMessage("Spawning Context is null: " + chunk.getPos());
@@ -354,21 +353,15 @@ public class ServerForgeEvents {
         var blockPos = event.getPos();
         if (!event.getLevel().isClientSide()) {
             var serverLevel = (ServerLevel) event.getLevel();
-            List<ContextUtils.StructureContext> structures = StructureLoader.loadStructures(serverLevel, blockPos);
-            List<ContextUtils.SpawnContext> structuresSets = StructureSetLoader.loadStructures();
-            for (ContextUtils.SpawnContext context : structuresSets) {
-                if ("test".equals(context.getName())) {
-                    for (ContextUtils.StructureContext structureContext : structures) {
-                        if ("test".equals(structureContext.getStructureName())) {
-                            findPotentialStructurePositions(structureContext,
-                                    context,
-                                    serverLevel.getChunk(blockPos).getPos(),
-                                    serverLevel, 100);
-                            break;
-                        }
-                    }
-                }
-            }
+            var structureContext = DSHelperClass.getStructureContext("test", serverLevel, blockPos);
+            var spawnContext = DSHelperClass.getSpawnContext("test");
+            findPotentialStructurePositions(structureContext,
+                    spawnContext,
+                    serverLevel.getChunk(blockPos).getPos(),
+                    serverLevel,
+                    100
+            );
+
         }
     }
 }
