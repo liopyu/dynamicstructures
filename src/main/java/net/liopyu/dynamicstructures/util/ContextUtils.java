@@ -39,7 +39,6 @@ public class ContextUtils {
         private static final int DEFAULT_SIZE_THRESHOLD = 30;
         private static final boolean DEFAULT_GENERATE_SPAWNERS = false;
         private static final int DEFAULT_MAX_SPAWNERS = 1;
-        private final ServerLevel level;
         private final Direction startDirection;
         private final String structureName;
         private final float ladderRoomChance;
@@ -57,8 +56,6 @@ public class ContextUtils {
          * Constructs a {@code ContextUtils$StructureContext} with the specified parameters.
          *
          * @param structureName     The name of the structure.
-         * @param level             The {@link ServerLevel} where the structure will be generated.
-         * @param startPos          The starting position for the structure generation.
          * @param ladderRoomChance  The percentage chance that a room will be a ladder room.
          * @param roomCount         The total number of rooms to generate.
          * @param height            The height of each room.
@@ -69,9 +66,7 @@ public class ContextUtils {
          * @param potentialSpawns   The list of potential entities that can spawn in the spawners.
          * @param sizeThreshold     The percentage variation allowed in room size.
          */
-        public StructureContext(String structureName, ServerLevel level, BlockPos startPos, float ladderRoomChance, int roomCount, int height, int width, int length, boolean generatesSpawners, int maxSpawners, List<EntityType<?>> potentialSpawns, int sizeThreshold) {
-            this.level = level;
-            this.startPos = startPos;
+        public StructureContext(String structureName, float ladderRoomChance, int roomCount, int height, int width, int length, boolean generatesSpawners, int maxSpawners, List<EntityType<?>> potentialSpawns, int sizeThreshold) {
             this.sizeThreshold = sizeThreshold;
             this.startDirection = getRandomDirection();
             this.structureName = structureName;
@@ -90,12 +85,10 @@ public class ContextUtils {
          * JSON file, normalizes the JSON data, and extracts the necessary fields to create a new {@code StructureContext} instance.
          *
          * @param json         The {@link JsonObject} containing the structure's configuration.
-         * @param level        The {@link ServerLevel} where the structure will be generated.
-         * @param startPos     The starting position for the structure generation.
          * @param jsonFilePath The file path of the JSON file, used for logging and deriving missing fields.
          * @return A new {@code ContextUtils$StructureContext} instance initialized with the values from the JSON object.
          */
-        public static StructureContext fromJson(JsonObject json, ServerLevel level, BlockPos startPos, String jsonFilePath) {
+        public static StructureContext fromJson(JsonObject json, String jsonFilePath) {
             JsonObject normalizedJson = normalizeJson(json);
             String structureName = normalizedJson.has("structure name") ? normalizedJson.get("structure name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureLoader.STRUCTURE_DIR);
@@ -123,8 +116,6 @@ public class ContextUtils {
             }
             return new StructureContext(
                     structureName,
-                    level,
-                    startPos,
                     ladderChance,
                     roomCount,
                     height,
@@ -190,15 +181,6 @@ public class ContextUtils {
          */
         public void setStartPos(BlockPos startPos) {
             this.startPos = startPos;
-        }
-
-        /**
-         * Gets the {@link ServerLevel} where the structure will be generated.
-         *
-         * @return The {@link ServerLevel}.
-         */
-        public ServerLevel getLevel() {
-            return level;
         }
 
         /**

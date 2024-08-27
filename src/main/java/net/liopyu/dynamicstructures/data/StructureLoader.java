@@ -13,7 +13,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The {@code StructureLoader} class is responsible for loading structure configurations
@@ -31,26 +33,24 @@ import java.util.List;
  *
  * <p><strong>Usage:</strong></p>
  * <ul>
- *   <li>{@link #loadStructures(ServerLevel, BlockPos)} - Loads and caches structures from JSON files.</li>
+ *   <li>{@link #loadStructures} - Loads and caches structures from JSON files.</li>
  *   <li>{@link #clearCache()} - Clears the cached structures, forcing a reload on the next access.</li>
  * </ul>
  */
 public class StructureLoader {
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structures/");
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    public static Map<String, ContextUtils.StructureContext> cachedStructures = new HashMap<>();
     private static boolean structuresLoaded = false;
-    private static List<ContextUtils.StructureContext> cachedStructures = new ArrayList<>();
 
     /**
      * Loads structure configurations from the specified directory. If structures have already
      * been loaded, the cached list is returned. If no structures are found, a default structure
      * is loaded.
      *
-     * @param level    The {@link ServerLevel} where the structures will be used.
-     * @param blockPos The starting position of the structure in the world.
-     * @return A list of loaded {@link ContextUtils.StructureContext} objects.
+     * @return A map of loaded {@link ContextUtils.StructureContext} objects and their names.
      */
-    public static List<ContextUtils.StructureContext> loadStructures(ServerLevel level, BlockPos blockPos) {
+    public static Map<String, ContextUtils.StructureContext> loadStructures() {
         if (structuresLoaded) {
             return cachedStructures;
         }
@@ -59,10 +59,10 @@ public class StructureLoader {
             STRUCTURE_DIR.mkdirs();
         }
 
-        loadJsonFilesRecursively(STRUCTURE_DIR, cachedStructures, level, blockPos);
+        loadJsonFilesRecursively(STRUCTURE_DIR, cachedStructures);
 
         if (cachedStructures.isEmpty()) {
-            loadDefaultStructure(level, cachedStructures, blockPos);
+            loadDefaultStructure(cachedStructures);
         }
 
         structuresLoaded = true;
@@ -71,7 +71,7 @@ public class StructureLoader {
 
     /**
      * Clears the cache of loaded structures, allowing them to be reloaded from disk
-     * on the next call to {@link #loadStructures(ServerLevel, BlockPos)}.
+     * on the next call to {@link #loadStructures}.
      */
     public static void clearCache() {
         cachedStructures.clear();
@@ -85,29 +85,27 @@ public class StructureLoader {
      * and skips adding the duplicate structure.
      *
      * @param directory  The directory to search for JSON files.
-     * @param structures The list where the parsed {@link ContextUtils.StructureContext}
+     * @param structures The map where the parsed {@link ContextUtils.StructureContext}
      *                   objects will be added.
-     * @param level      The {@link ServerLevel} instance used for loading structures.
-     * @param blockPos   The starting {@link BlockPos} used for structure placement.
      */
-    private static void loadJsonFilesRecursively(File directory, List<ContextUtils.StructureContext> structures, ServerLevel level, BlockPos blockPos) {
+    private static void loadJsonFilesRecursively(File directory, Map<String, ContextUtils.StructureContext> structures) {
         File[] files = directory.listFiles();
         if (files != null) {
             for (File file : files) {
                 if (file.isDirectory()) {
-                    loadJsonFilesRecursively(file, structures, level, blockPos);
+                    loadJsonFilesRecursively(file, structures);
                 } else if (file.isFile() && file.getName().endsWith(".json")) {
                     try (FileReader reader = new FileReader(file)) {
                         JsonElement jsonElement = JsonParser.parseReader(reader);
                         if (jsonElement.isJsonObject()) {
                             JsonObject jsonObject = jsonElement.getAsJsonObject();
-                            ContextUtils.StructureContext newContext = ContextUtils.StructureContext.fromJson(jsonObject, level, blockPos, file.getAbsolutePath());
-                            boolean alreadyExists = structures.stream()
-                                    .anyMatch(existingContext -> existingContext.getStructureName().equals(newContext.getStructureName()));
+                            ContextUtils.StructureContext newContext = ContextUtils.StructureContext.fromJson(jsonObject, file.getAbsolutePath());
+                            boolean alreadyExists = structures.keySet().stream()
+                                    .anyMatch(existingContext -> existingContext.equals(newContext.getStructureName()));
                             if (alreadyExists) {
                                 DSHelperClass.logErrorMessage("Structure '" + newContext.getStructureName() + "' is already registered. Skipping duplicate entry in file: " + file.getAbsolutePath());
                             } else {
-                                structures.add(newContext);
+                                structures.put(newContext.getStructureName(), newContext);
                             }
                         }
                     } catch (IOException e) {
@@ -123,11 +121,9 @@ public class StructureLoader {
      * Loads a default structure configuration if no other structures are found.
      * The default structure is defined in {@link #DEFAULT_STRUCTURE_FILE}.
      *
-     * @param level      The {@link ServerLevel} where the structures will be used.
-     * @param structures The list to store the loaded {@link ContextUtils.StructureContext} objects.
-     * @param blockPos   The starting position of the structure in the world.
+     * @param structures The map to store the loaded {@link ContextUtils.StructureContext} objects and their names.
      */
-    private static void loadDefaultStructure(ServerLevel level, List<ContextUtils.StructureContext> structures, BlockPos blockPos) {
+    private static void loadDefaultStructure(Map<String, ContextUtils.StructureContext> structures) {
         try {
             if (!DEFAULT_STRUCTURE_FILE.exists()) {
                 createDefaultStructureFile();
@@ -136,8 +132,8 @@ public class StructureLoader {
                 JsonElement jsonElement = JsonParser.parseReader(reader);
                 if (jsonElement.isJsonObject()) {
                     JsonObject jsonObject = jsonElement.getAsJsonObject();
-                    ContextUtils.StructureContext context = ContextUtils.StructureContext.fromJson(jsonObject, level, blockPos, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
-                    structures.add(context);
+                    ContextUtils.StructureContext context = ContextUtils.StructureContext.fromJson(jsonObject, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
+                    structures.put(context.getStructureName(), context);
                 }
             }
         } catch (IOException e) {

@@ -13,6 +13,7 @@ import net.minecraftforge.fml.loading.FMLEnvironment;
 import java.io.File;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -309,28 +310,19 @@ public class DSHelperClass {
     }
 
     /**
-     * Retrieves the {@link ContextUtils.StructureContext} corresponding to the specified structure name.
+     * Retrieves a {@link ContextUtils.StructureContext} instance based on the provided structure name.
+     * This method checks if a structure with the given name exists within the loaded structures.
+     * If the structure is found, its corresponding {@link ContextUtils.StructureContext} is returned.
+     * If not found, a warning message is logged, and {@code null} is returned.
      *
-     * <p>This method searches through the loaded structure contexts to find a match for the given
-     * structure name in the specified {@link ServerLevel}. If a match is found, the corresponding
-     * {@link ContextUtils.StructureContext} is returned. If no match is found, a warning is logged,
-     * and {@code null} is returned.</p>
-     *
-     * @param structureName The name of the structure to find the corresponding {@link ContextUtils.StructureContext}.
-     * @param level         The {@link ServerLevel} in which to search for the structure.
-     * @param blockPos      The {@link BlockPos} position used for loading structure contexts.
-     * @return The {@link ContextUtils.StructureContext} corresponding to the given structure name,
-     * or {@code null} if no match is found.
-     * @see ContextUtils.StructureContext
-     * @see StructureLoader#loadStructures(ServerLevel, BlockPos)
-     * @see DSHelperClass#logWarningMessage(String)
+     * @param structureName The name of the structure to retrieve the {@link ContextUtils.StructureContext} for.
+     * @return The {@link ContextUtils.StructureContext} associated with the given structure name,
+     * or {@code null} if no such structure is found.
      */
-    public static ContextUtils.StructureContext getStructureContext(String structureName, ServerLevel level, BlockPos blockPos) {
-        List<ContextUtils.StructureContext> structures = StructureLoader.loadStructures(level, blockPos);
-        for (ContextUtils.StructureContext context : structures) {
-            if (structureName.equals(context.getStructureName())) {
-                return context;
-            }
+    public static ContextUtils.StructureContext getStructureContext(String structureName) {
+        Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
+        if (structures.containsKey(structureName)) {
+            return structures.get(structureName);
         }
         DSHelperClass.logWarningMessage("StructureContext with name '" + structureName + "' not found.");
         return null;

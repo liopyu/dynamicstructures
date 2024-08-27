@@ -69,11 +69,10 @@ public class DungeonGenerator {
      *
      * @param structureContext The {@link ContextUtils.StructureContext} containing the configuration and parameters for the dungeon generation. This includes the starting position, room count, room dimensions, and other settings.
      */
-    public static void generateDungeon(ContextUtils.StructureContext structureContext) {
-        ServerLevel world = structureContext.getLevel();
+    public static void generateDungeon(ContextUtils.StructureContext structureContext, ServerLevel world) {
         BlockPos startPos = structureContext.getStartPos();
         Direction startDirection = structureContext.getStartDirection();
-        RandomSource random = structureContext.getLevel().getRandom();
+        RandomSource random = world.getRandom();
         float ladderRoomChance = structureContext.getLadderRoomChance();
         int roomCount = structureContext.getRoomCount();
         int height = structureContext.getHeight();
