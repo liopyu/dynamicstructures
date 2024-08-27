@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 import java.io.File;
 import java.util.HashSet;
@@ -12,13 +13,18 @@ import java.util.function.Consumer;
 
 import static com.mojang.text2speech.Narrator.LOGGER;
 
+/**
+ * Utility class providing helper methods for logging warnings and normalizing JSON objects.
+ * This class is part of the {@code DSHelperClass} and includes methods to log default values
+ * and normalize JSON objects by converting keys to lowercase and handling different data types.
+ */
 public class DSHelperClass {
     public static final Set<String> errorMessagesLogged = new HashSet<>();
     public static final Set<String> warningMessagesLogged = new HashSet<>();
 
     public static void logErrorMessageOnce(String errorMessage) {
-        if (!errorMessagesLogged.contains(errorMessage)) {
-            LOGGER.error(errorMessage);
+        if (!errorMessagesLogged.contains("[Dynamic Structures]: " + errorMessage)) {
+            LOGGER.error("[Dynamic Structures]: " + errorMessage);
             errorMessagesLogged.add(errorMessage);
         }
     }
@@ -28,8 +34,8 @@ public class DSHelperClass {
     }
 
     public static void logWarningMessageOnce(String errorMessage) {
-        if (!warningMessagesLogged.contains(errorMessage)) {
-            LOGGER.warn(errorMessage);
+        if (!warningMessagesLogged.contains("[Dynamic Structures]: " + errorMessage)) {
+            LOGGER.warn("[Dynamic Structures]: " + errorMessage);
             warningMessagesLogged.add(errorMessage);
         }
     }
@@ -39,8 +45,8 @@ public class DSHelperClass {
     }
 
     public static void logErrorMessageOnceCatchable(String errorMessage, Throwable e) {
-        if (!errorMessagesLogged.contains(errorMessage)) {
-            LOGGER.error(errorMessage, e);
+        if (!errorMessagesLogged.contains("[Dynamic Structures]: " + errorMessage)) {
+            LOGGER.error("[Dynamic Structures]: " + errorMessage, e);
             errorMessagesLogged.add(errorMessage);
         }
     }
@@ -145,6 +151,18 @@ public class DSHelperClass {
         }
     }
 
+    /**
+     * Derives and returns the structure name from a given JSON file path by converting it to a relative path.
+     * This method removes the base path of the provided file and any file extension (e.g., ".json"),
+     * converting file separators to standardize the path format.
+     * <p>
+     * The resulting string represents the relative structure name, which can be used for matching
+     * or identifying structures within the game's file system.
+     *
+     * @param jsonFilePath The absolute path of the JSON file representing the structure.
+     * @param file         The base file from which to derive the relative structure name.
+     * @return The derived structure name as a relative path string.
+     */
     public static String deriveStructureNameFromPath(String jsonFilePath, File file) {
         String relativePath = jsonFilePath.replace(file.getAbsolutePath(), "").replace(File.separator, "/");
         if (relativePath.startsWith("/")) {
@@ -156,11 +174,38 @@ public class DSHelperClass {
         return relativePath;
     }
 
+    /**
+     * Logs a warning message indicating that a field is missing or null in the specified JSON file,
+     * and returns the provided default value. This method is useful for handling cases where
+     * certain fields are optional or might be absent in the JSON configuration.
+     *
+     * <p>This method logs the warning only once per field name to avoid repetitive log entries.</p>
+     *
+     * @param <T>          The type of the default value.
+     * @param fieldName    The name of the field that is missing or null.
+     * @param defaultValue The default value to be returned.
+     * @param jsonFilePath The path to the JSON file where the field is missing.
+     * @return The default value provided.
+     * @see #normalizeJson(JsonObject)
+     */
     public static <T> T logDefault(String fieldName, T defaultValue, String jsonFilePath) {
         DSHelperClass.logWarningMessageOnce(fieldName + " is missing or null in " + jsonFilePath + ". Defaulting to [" + defaultValue + "].");
         return defaultValue;
     }
 
+    /**
+     * Normalizes a JSON object by converting all keys to lowercase and ensuring that the values are properly handled
+     * according to their data types. This method is particularly useful for ensuring case-insensitivity in JSON keys
+     * and for processing JSON objects with mixed data types.
+     *
+     * <p>The method iterates through each entry in the provided JSON object, converts the key to lowercase,
+     * and re-adds the value to a new JSON object with the normalized key. It handles primitive types, arrays,
+     * and nested JSON objects appropriately.</p>
+     *
+     * @param json The original JSON object to be normalized.
+     * @return A new JSON object with normalized keys and values.
+     * @see #logDefault(String, Object, String)
+     */
     public static JsonObject normalizeJson(JsonObject json) {
         JsonObject normalizedJson = new JsonObject();
         json.entrySet().forEach(entry -> {
@@ -181,6 +226,44 @@ public class DSHelperClass {
             }
         });
         return normalizedJson;
+    }
+
+    /**
+     * A generic utility method that attempts to cast an object to the specified type.
+     *
+     * <p>This method performs an unchecked cast and includes error handling to log
+     * any {@link ClassCastException} that occurs during the casting process.</p>
+     *
+     * <p>If a {@code ClassCastException} is thrown, the exception is logged using
+     * {@link DSHelperClass#logErrorMessageCatchable(String, Throwable)} and the method
+     * returns {@code null}.</p>
+     *
+     * @param <T> The type to which the object is to be cast.
+     * @param o   The object to be cast.
+     * @return The object cast to the specified type {@code T}, or {@code null} if the cast fails.
+     */
+    public static <T> T cast(Object o) {
+        try {
+            return (T) o;
+        } catch (ClassCastException cce) {
+            DSHelperClass.logErrorMessageCatchable("", cce);
+            return null;
+        }
+    }
+
+
+    /**
+     * Runs the provided Runnable if the current environment matches the specified environment.
+     *
+     * @param prodEnvironment If true, run the code in a production environment. If false, run the code in a development environment.
+     * @param runnable        The code to run in the specified environment.
+     */
+    public static void environmentRunnable(boolean prodEnvironment, Runnable runnable) {
+        if (prodEnvironment && FMLEnvironment.production) {
+            runnable.run();
+        } else if (!FMLEnvironment.production) {
+            runnable.run();
+        }
     }
 
 }

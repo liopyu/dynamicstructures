@@ -33,12 +33,48 @@ public class DungeonGenerator {
             Blocks.OAK_SLAB, Blocks.STONE_SLAB, Blocks.BRICK_SLAB, Blocks.COBBLESTONE_SLAB
     };
     protected static int defaultDoorwayRadius = 3;
+
+    /**
+     * Generates a complex dungeon structure within the world, consisting of multiple interconnected rooms.
+     * The dungeon is dynamically generated based on the parameters provided in the {@link ContextUtils.StructureContext}.
+     *
+     * <p>The dungeon generation process includes the following key features:
+     * <ul>
+     *   <li>Rooms of varying sizes, determined randomly within specified size thresholds.</li>
+     *   <li>Ladder rooms, which are vertical connections between two stacked rooms.</li>
+     *   <li>Optional mob spawners placed randomly within rooms, spawning entities from a specified list.</li>
+     *   <li>Interconnected rooms with doorways, randomly oriented to create a labyrinthine structure.</li>
+     * </ul>
+     *
+     * <p>The dungeon is generated as follows:
+     * <ol>
+     *   <li>The method begins at a specified starting position and direction within the world.</li>
+     *   <li>For each room (up to the specified room count), the method determines the room's dimensions randomly, based on base dimensions and a size threshold.</li>
+     *   <li>Rooms are either regular rooms or ladder rooms, with a chance for a ladder room determined by the {@code ladderRoomChance} parameter.</li>
+     *   <li>If a ladder room is generated, two stacked rooms are created, connected by a ladder. Doorways are added to both rooms, and spawners may be placed if enabled.</li>
+     *   <li>If a regular room is generated, the room is built with walls, a floor, and optionally a roof. A doorway is added, and spawners may be placed if enabled.</li>
+     *   <li>After each room is generated, the position and direction for the next room are calculated, potentially changing direction randomly.</li>
+     *   <li>This process repeats until the specified number of rooms has been generated.</li>
+     * </ol>
+     *
+     * <p>This method utilizes several helper methods:
+     * <ul>
+     *   <li>{@link #generateRoom(ServerLevel, BlockPos, int, int, int, Block, Block, Block, Set, boolean, boolean)} to create individual rooms.</li>
+     *   <li>{@link #generateLadderRoom(ServerLevel, BlockPos, int, int, int, Block, Block, Block, boolean, Direction)} to create ladder rooms.</li>
+     *   <li>{@link #placeSpawners(ServerLevel, BlockPos, int, int, int, RandomSource, int, List)} to place spawners within rooms.</li>
+     *   <li>{@link #placeDoorway(ServerLevel, BlockPos, int, int, Direction, RandomSource, int)} to create doorways connecting rooms.</li>
+     *   <li>{@link #calculateNextRoomPos(BlockPos, int, int, Direction)} to determine the position of the next room based on the current direction.</li>
+     *   <li>{@link #getRandomSize(int, RandomSource, int)} to calculate the random dimensions of each room.</li>
+     * </ul>
+     *
+     * @param structureContext The {@link ContextUtils.StructureContext} containing the configuration and parameters for the dungeon generation. This includes the starting position, room count, room dimensions, and other settings.
+     */
     public static void generateDungeon(ContextUtils.StructureContext structureContext) {
         ServerLevel world = structureContext.getLevel();
-        BlockPos startPos =structureContext.getStartPos();
+        BlockPos startPos = structureContext.getStartPos();
         Direction startDirection = structureContext.getStartDirection();
-        RandomSource random =structureContext.getLevel().getRandom();
-        float ladderRoomChance =structureContext.getLadderRoomChance();
+        RandomSource random = structureContext.getLevel().getRandom();
+        float ladderRoomChance = structureContext.getLadderRoomChance();
         int roomCount = structureContext.getRoomCount();
         int height = structureContext.getHeight();
         int baseWidth = structureContext.getWidth();
@@ -46,102 +82,104 @@ public class DungeonGenerator {
         int sizeThreshold = structureContext.getSizeThreshold();
         boolean generatesSpawners = structureContext.isGeneratesSpawners();
         int maxSpawners = structureContext.getMaxSpawners();
-        List<EntityType<?>> potentialSpawns =structureContext.getPotentialSpawns();
+        List<EntityType<?>> potentialSpawns = structureContext.getPotentialSpawns();
         Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
         Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
         Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
-
         Set<BlockPos> previousRoomWalls = null;
         BlockPos currentPos = startPos;
         Direction currentDirection = startDirection;
-
         for (int i = 0; i < roomCount; i++) {
-            // Calculate random width and length within 30% of the base values
-            int width = getRandomSize(baseWidth, random,sizeThreshold);
-            int length = getRandomSize(baseLength, random,sizeThreshold);
-
-            boolean isLadderRoom = random.nextInt(100) < ladderRoomChance; // 20% chance for a ladder room
-
+            int width = getRandomSize(baseWidth, random, sizeThreshold);
+            int length = getRandomSize(baseLength, random, sizeThreshold);
+            boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
             if (isLadderRoom) {
-                // Generate both lower and upper ladder rooms
                 generateLadderRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true, currentDirection);
-
-                // Place doorways for both lower and upper rooms
                 placeDoorway(world, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 BlockPos upperRoomPos = currentPos.above(height);
                 placeDoorway(world, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);
-
-                // Place spawners if configured
                 if (generatesSpawners) {
                     placeSpawners(world, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
                     placeSpawners(world, upperRoomPos, width, length, height, random, maxSpawners, potentialSpawns);
                 }
-
-                // Move to the next room position after the upper room
                 currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
             } else {
                 Set<BlockPos> currentRoomWalls = generateRoom(world, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
                 previousRoomWalls = currentRoomWalls;
-
-                // Place the doorway for the regular room
                 placeDoorway(world, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
-
-                // Place spawners if configured
                 if (generatesSpawners) {
                     placeSpawners(world, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
                 }
-
-                // Move to the next room position
                 currentPos = calculateNextRoomPos(currentPos, width, length, currentDirection);
             }
-
-            // Randomly change the direction for the next room
             currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
         }
     }
 
-
+    /**
+     * Places a random number of spawners within the specified area of the world. The spawners are randomly distributed
+     * within the given width, length, and height, and each spawner is assigned a random entity type from the provided list of potential spawns.
+     *
+     * @param world           The {@link ServerLevel} where the spawners should be placed.
+     * @param pos             The starting {@link BlockPos} of the area in the world where the spawners will be placed.
+     * @param width           The width of the area within which the spawners will be placed.
+     * @param length          The length of the area within which the spawners will be placed.
+     * @param height          The height of the area within which the spawners will be placed.
+     * @param random          The {@link RandomSource} used to determine the number and positions of the spawners.
+     * @param maxSpawners     The maximum number of spawners that can be placed per room.
+     * @param potentialSpawns A list of {@link EntityType} representing the types of entities that can be spawned by the spawners.
+     */
     private static void placeSpawners(ServerLevel world, BlockPos pos, int width, int length, int height, RandomSource random, int maxSpawners, List<EntityType<?>> potentialSpawns) {
         int spawnersToPlace = random.nextInt(maxSpawners + 1); // Randomly decide how many spawners to place, up to maxSpawners
-
         for (int i = 0; i < spawnersToPlace; i++) {
-            // Randomly pick a position within the room
             int x = pos.getX() + random.nextInt(width);
-            int y = pos.getY()+ random.nextInt(height);
+            int y = pos.getY() + random.nextInt(height);
             int z = pos.getZ() + random.nextInt(length);
-
             BlockPos spawnerPos = new BlockPos(x, y, z);
-
-            // Select a random entity type from the list
             EntityType<?> entityType = potentialSpawns.get(random.nextInt(potentialSpawns.size()));
-
-            // Place the spawner block and set its entity type
             world.setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3);
-
             BlockEntity blockEntity = world.getBlockEntity(spawnerPos);
             if (blockEntity instanceof SpawnerBlockEntity spawnerEntity) {
-                spawnerEntity.getSpawner().setEntityId(entityType,world,world.random,spawnerPos);
+                spawnerEntity.getSpawner().setEntityId(entityType, world, world.random, spawnerPos);
             }
         }
     }
-    public static int getRandomSize(int baseSize, RandomSource random, int sizeThreshold) {
-        // Calculate variation based on the size threshold
-        int variation = (int) (baseSize * (sizeThreshold / 100.0));
 
-        // Randomly adjust the size within ±sizeThreshold% of the base size
+    /**
+     * Calculates a random size based on a base size and a size threshold. The method adds or subtracts a random
+     * variation, determined by the size threshold, from the base size to produce the final size.
+     *
+     * @param baseSize      The base size from which the random size is derived.
+     * @param random        The {@link RandomSource} used to generate random numbers.
+     * @param sizeThreshold The percentage threshold for size variation. The variation is calculated as a percentage of the base size.
+     * @return The randomly adjusted size within the range of ±{@code sizeThreshold}% of the {@code baseSize}.
+     */
+    public static int getRandomSize(int baseSize, RandomSource random, int sizeThreshold) {
+        int variation = (int) (baseSize * (sizeThreshold / 100.0));
         return baseSize + random.nextInt(variation * 2 + 1) - variation;
     }
 
-
-    public static void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, boolean forceOverlap,Direction currentDirection) {
-        // Generate the lower room
-        Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, null, forceOverlap,true);
-
-        // Place the ladder on one of the walls
-        Direction ladderFacing = Direction.EAST; // Typically the ladder would face towards the interior
-        BlockPos ladderBase = basePos.offset(width / 2 - 1, 1, length / 2 - 1); // Positioned on the floor against the wall
-
-        // Install the ladder from the floor to the ceiling of the lower room
+    /**
+     * Generates a ladder room within the specified area of the world. The ladder room consists of two stacked rooms connected by a ladder.
+     * The method generates the lower room, places a ladder that spans from the floor to the ceiling of the lower room, then generates the upper room,
+     * ensuring that the roof of the lower room is opened where the ladder reaches the upper room.
+     * Finally, a doorway is placed in the lower room, leading in the specified {@link Direction}.
+     *
+     * @param world            The {@link ServerLevel} where the ladder room should be generated.
+     * @param basePos          The starting {@link BlockPos} of the lower room in the world.
+     * @param width            The width of the rooms.
+     * @param length           The length of the rooms.
+     * @param height           The height of the rooms.
+     * @param floorBlock       The {@link Block} type to be used for the floors.
+     * @param wallBlock        The {@link Block} type to be used for the walls.
+     * @param roofBlock        The {@link Block} type to be used for the roofs.
+     * @param forceOverlap     Whether the walls of the room should forcibly overlap existing walls.
+     * @param currentDirection The {@link Direction} in which the doorway should be placed.
+     */
+    public static void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, boolean forceOverlap, Direction currentDirection) {
+        Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, null, forceOverlap, true);
+        Direction ladderFacing = Direction.EAST;
+        BlockPos ladderBase = basePos.offset(width / 2 - 1, 1, length / 2 - 1);
         for (int i = 0; i < height; i++) {
             BlockPos ladderPos = ladderBase.above(i);
             BlockState ladderState = Blocks.LADDER.defaultBlockState()
@@ -149,41 +187,58 @@ public class DungeonGenerator {
                     .setValue(LadderBlock.WATERLOGGED, false);
             world.setBlock(ladderPos, ladderState, 3);
         }
-
-        // Top of the ladder room position at the roof of the lower room
         BlockPos topRoomPos = basePos.above(height);
-
-        // Generate the upper room, making sure to override the ceiling of the lower room
-        generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls, true,false);
-
-        // Ensure there's an opening at the top of the ladder into the new room
+        generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls, true, false);
         BlockPos opening = ladderBase.above(height);
-        world.setBlock(opening, Blocks.AIR.defaultBlockState(), 3); // Clear the entry point into the upper room
-        placeDoorway(world, basePos, width, length, currentDirection, world.random,defaultDoorwayRadius);
+        world.setBlock(opening, Blocks.AIR.defaultBlockState(), 3);
+        placeDoorway(world, basePos, width, length, currentDirection, world.random, defaultDoorwayRadius);
     }
+
+    /**
+     * Generates a room within the specified area of the world by creating walls, a floor, and optionally a roof.
+     * The method first generates the walls and floor, and if the room is not at the bottom of a structure, it also generates a roof.
+     * The interior of the room is then cleared of any non-wall blocks by filling it with air.
+     *
+     * @param world        The {@link ServerLevel} where the room should be generated.
+     * @param pos          The starting {@link BlockPos} of the room in the world.
+     * @param width        The width of the room.
+     * @param length       The length of the room.
+     * @param height       The height of the room.
+     * @param floorBlock   The {@link Block} type to be used for the floor.
+     * @param wallBlock    The {@link Block} type to be used for the walls.
+     * @param roofBlock    The {@link Block} type to be used for the roof, if applicable.
+     * @param overlapWalls A set of {@link BlockPos} representing the positions where walls from previous rooms may overlap. Can be {@code null} if not applicable.
+     * @param forceOverlap Whether the walls of the room should forcibly overlap existing walls.
+     * @param isBottomRoom Whether this room is at the bottom of a structure, in which case a roof is not generated.
+     * @return A {@link Set} of {@link BlockPos} representing the positions of the wall blocks that were placed.
+     */
     private static Set<BlockPos> generateRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap, boolean isBottomRoom) {
         Set<BlockPos> wallPositions = new HashSet<>();
-
         generateWalls(world, pos, width, length, height, wallBlock, wallPositions, overlapWalls, forceOverlap);
         generateFloor(world, pos, width, length, floorBlock, wallPositions);
-
-        // Skip roof generation if this is the bottom room of a ladder structure
         if (!isBottomRoom) {
             generateRoof(world, pos, width, length, height, roofBlock);
         }
-
         fillRoomInteriorWithAir(world, pos, width, length, height, wallPositions);
-
         return wallPositions;
     }
 
-
+    /**
+     * Fills the interior of a room with air blocks, clearing out any blocks that are not part of the walls.
+     * The method iterates through the interior space of the room and replaces any non-wall blocks with air.
+     *
+     * @param world         The {@link ServerLevel} where the room's interior should be filled with air.
+     * @param pos           The starting {@link BlockPos} of the room in the world.
+     * @param width         The width of the room.
+     * @param length        The length of the room.
+     * @param height        The height of the room.
+     * @param wallPositions A set of {@link BlockPos} representing the positions of the wall blocks, where air blocks should not be placed.
+     */
     private static void fillRoomInteriorWithAir(ServerLevel world, BlockPos pos, int width, int length, int height, Set<BlockPos> wallPositions) {
         for (int x = 1; x < width - 1; x++) {
             for (int z = 1; z < length - 1; z++) {
                 for (int y = 1; y <= height; y++) {
                     BlockPos blockPos = pos.offset(x, y, z);
-                    // Ensure the position is not part of the walls or boundaries
                     if (!wallPositions.contains(blockPos)) {
                         world.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
                     }
@@ -192,12 +247,22 @@ public class DungeonGenerator {
         }
     }
 
+    /**
+     * Generates the floor of a room within the specified area of the world. The method places the specified
+     * {@link Block} floor blocks, ensuring that no blocks are placed where there are wall blocks or ladder blocks.
+     * If a ladder block is encountered, it is replaced with an air block.
+     *
+     * @param world         The {@link ServerLevel} where the floor should be generated.
+     * @param pos           The starting {@link BlockPos} of the floor in the world.
+     * @param width         The width of the room.
+     * @param length        The length of the room.
+     * @param floorBlock    The {@link Block} type to be used for the floor of the room.
+     * @param wallPositions A set of {@link BlockPos} representing the positions of the wall blocks, where the floor blocks should not be placed.
+     */
     private static void generateFloor(ServerLevel world, BlockPos pos, int width, int length, Block floorBlock, Set<BlockPos> wallPositions) {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos floorPos = pos.offset(x, 0, z);
-
-                // Check if the block below the floor position is a ladder
                 if (world.getBlockState(floorPos).getBlock() instanceof LadderBlock) {
                     world.setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3);
                 } else if (!wallPositions.contains(floorPos)) {
@@ -207,118 +272,178 @@ public class DungeonGenerator {
         }
     }
 
-
-    private static void generateWalls(ServerLevel world, BlockPos pos, int width, int length, int height, Block wallBlock, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls,boolean forceOverlap) {
+    /**
+     * Generates the walls of a room within the specified area of the world. The method places the specified
+     * {@link Block} wall blocks along the edges of the room, adjusting for overlap with previous walls if necessary.
+     * The walls are generated to a specified height, with options to force overlap or avoid it.
+     *
+     * @param world         The {@link ServerLevel} where the walls should be generated.
+     * @param pos           The starting {@link BlockPos} of the room in the world.
+     * @param width         The width of the room.
+     * @param length        The length of the room.
+     * @param height        The height of the walls to be generated.
+     * @param wallBlock     The {@link Block} type to be used for the walls of the room.
+     * @param wallPositions A set of {@link BlockPos} representing the positions of the wall blocks that are placed.
+     * @param overlapWalls  A set of {@link BlockPos} where walls from previous rooms may overlap. Can be {@code null} if not applicable.
+     * @param forceOverlap  Whether the walls of the room should forcibly overlap existing walls.
+     */
+    private static void generateWalls(ServerLevel world, BlockPos pos, int width, int length, int height, Block wallBlock, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
         for (int y = 1; y <= height + 1; y++) {
             for (int x = 0; x < width; x++) {
-                addWallBlock(world, pos.offset(x, y, 0), wallBlock, wallPositions, overlapWalls,forceOverlap);
-                addWallBlock(world, pos.offset(x, y, length - 1), wallBlock, wallPositions, overlapWalls,forceOverlap);
+                addWallBlock(world, pos.offset(x, y, 0), wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(world, pos.offset(x, y, length - 1), wallBlock, wallPositions, overlapWalls, forceOverlap);
             }
             for (int z = 1; z < length - 1; z++) {
-                addWallBlock(world, pos.offset(0, y, z), wallBlock, wallPositions, overlapWalls,forceOverlap);
-                addWallBlock(world, pos.offset(width - 1, y, z), wallBlock, wallPositions, overlapWalls,forceOverlap);
+                addWallBlock(world, pos.offset(0, y, z), wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(world, pos.offset(width - 1, y, z), wallBlock, wallPositions, overlapWalls, forceOverlap);
             }
         }
     }
+
+    /**
+     * Adds a wall block at the specified {@link BlockPos} in the world, considering various conditions such as
+     * existing blocks, overlap with previous walls, and adjacency to other wall blocks. The method ensures that
+     * walls are placed correctly and can handle forced overlap or removal of blocks based on the provided parameters.
+     *
+     * @param world         The {@link ServerLevel} where the wall block should be placed.
+     * @param pos           The {@link BlockPos} in the world where the wall block will be placed.
+     * @param block         The {@link Block} type to be used for the wall.
+     * @param wallPositions A set of {@link BlockPos} representing the positions of the wall blocks that are placed.
+     * @param overlapWalls  A set of {@link BlockPos} where walls from previous rooms may overlap. Can be {@code null} if not applicable.
+     * @param forceOverlap  Whether the wall block should forcibly overlap existing blocks, even if they are not suitable for wall placement.
+     */
     private static void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
-        // Check if the block is suitable for wall placement
         if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(pos).getBlock()) ||
                 world.getBlockState(pos).getBlock() instanceof LiquidBlock ||
                 world.getBlockState(pos).isAir()) {
-
             world.setBlock(pos, block.defaultBlockState(), 3);
             wallPositions.add(pos);
         } else if (forceOverlap) {
-            // Force overlap: Place the wall block even if it overlaps with an existing wall
             world.setBlock(pos, block.defaultBlockState(), 3);
             wallPositions.add(pos);
         } else if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
-            // If not forcing overlap, clear the position (place air) if it's a shared wall
             world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         } else {
-            // Check adjacent blocks for double walls
             for (Direction direction : Direction.values()) {
                 BlockPos adjacentPos = pos.relative(direction);
                 if (wallPositions.contains(adjacentPos)) {
                     world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-                    return; // Exit early after setting to air to prevent placing a block
+                    return;
                 }
             }
         }
     }
 
-
+    /**
+     * Generates the roof of a room within the specified area of the world. The method places the specified
+     * {@link Block} roof block on top of the room, ensuring that the roof is only placed in suitable locations,
+     * such as air or liquid blocks, and avoids placing roof blocks over existing walls.
+     *
+     * @param world     The {@link ServerLevel} where the roof should be generated.
+     * @param pos       The starting {@link BlockPos} of the room in the world.
+     * @param width     The width of the room.
+     * @param length    The length of the room.
+     * @param height    The height of the room, which determines the elevation of the roof.
+     * @param roofBlock The {@link Block} type to be used for the roof of the room.
+     */
     private static void generateRoof(ServerLevel world, BlockPos pos, int width, int length, int height, Block roofBlock) {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos roofPos = pos.offset(x, height + 1, z);
-                if (!(world.getBlockState(roofPos).getBlock() instanceof LiquidBlock||
-                        world.getBlockState(roofPos).is(Blocks.AIR)||
-                        world.getBlockState(roofPos).is(Blocks.CAVE_AIR)||
-                        Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(roofPos).getBlock()))){
+                if (!(world.getBlockState(roofPos).getBlock() instanceof LiquidBlock ||
+                        world.getBlockState(roofPos).is(Blocks.AIR) ||
+                        world.getBlockState(roofPos).is(Blocks.CAVE_AIR) ||
+                        Arrays.stream(WALL_BLOCKS).toList().contains(world.getBlockState(roofPos).getBlock()))) {
                     continue;
                 }
-                // Place the roof block if no wall block is present
                 world.setBlock(roofPos, roofBlock.defaultBlockState(), 3);
             }
         }
     }
 
+    /**
+     * Determines whether a wall at the specified {@link BlockPos} is a shared wall, meaning it has overlapping
+     * walls on opposite sides. The method checks if the wall at the given position is part of a continuous
+     * wall segment by verifying that there are walls on both the north-south and east-west axes.
+     *
+     * @param pos          The {@link BlockPos} of the wall block being checked.
+     * @param overlapWalls A set of {@link BlockPos} representing walls that may overlap. Used to determine if the wall is shared.
+     * @return {@code true} If the wall at the specified position is a shared wall with overlaps on both axes; {@code false} otherwise.
+     */
     private static boolean isSharedWall(BlockPos pos, Set<BlockPos> overlapWalls) {
         return (overlapWalls.contains(pos.north()) && overlapWalls.contains(pos.south())) ||
                 (overlapWalls.contains(pos.east()) && overlapWalls.contains(pos.west()));
     }
 
-    private static void placeDoorway(ServerLevel world, BlockPos pos, int width, int length, Direction direction, RandomSource random,int radius) {
-        placeSingleDoor(world, pos, width, length, direction, random,radius);
-        placeSingleDoor(world, pos, width, length, direction.getOpposite(), random,radius);
-        placeSingleDoor(world, pos, width, length, Direction.EAST, random,radius);
-        placeSingleDoor(world, pos, width, length, Direction.WEST, random,radius);
+    /**
+     * Places doorways at the specified position in the world, creating openings in multiple {@link Direction directions}.
+     * The method places doorways on both sides of the room in the specified {@code direction}, as well as on the {@link Direction#EAST EAST} and {@link Direction#WEST WEST} sides.
+     * Each doorway is created with a configurable {@code radius}.
+     *
+     * @param world     The {@link ServerLevel} where the doorways should be placed.
+     * @param pos       The starting {@link BlockPos} of the room where the doorways will be created.
+     * @param width     The width of the room.
+     * @param length    The length of the room.
+     * @param direction The primary {@link Direction} in which the doorway should be placed.
+     * @param random    The {@link RandomSource} used for determining variations in doorway placement.
+     * @param radius    The radius of the doorway, determining the size of the opening.
+     */
+    private static void placeDoorway(ServerLevel world, BlockPos pos, int width, int length, Direction direction, RandomSource random, int radius) {
+        placeSingleDoor(world, pos, width, length, direction, random, radius);
+        placeSingleDoor(world, pos, width, length, direction.getOpposite(), random, radius);
+        placeSingleDoor(world, pos, width, length, Direction.EAST, random, radius);
+        placeSingleDoor(world, pos, width, length, Direction.WEST, random, radius);
     }
+
+    /**
+     * Places a single doorway at the specified position in the world, creating an opening in the given {@link Direction}.
+     * The method adjusts the position of the doorway based on the room's {@code width} and {@code length} and the specified {@code doorRadius}.
+     * Doorways are created by clearing blocks within the specified radius, ensuring that the doorway is not obstructed by blocks such as {@link DungeonGenerator#ROOF_BLOCKS Roof Blocks}.
+     *
+     * @param world      The {@link ServerLevel} where the doorway should be placed.
+     * @param pos        The starting {@link BlockPos position} of the room where the doorway will be created.
+     * @param width      The width of the room.
+     * @param length     The length of the room.
+     * @param direction  The {@link Direction} in which the doorway should be placed (e.g., {@link Direction#NORTH NORTH}, {@link Direction#SOUTH SOUTH}, {@link Direction#EAST EAST}, {@link Direction#WEST WEST}).
+     * @param random     The {@link RandomSource} used for determining variations in doorway placement.
+     * @param doorRadius The radius of the doorway, determining the size of the opening.
+     */
     private static void placeSingleDoor(ServerLevel world, BlockPos pos, int width, int length, Direction direction, RandomSource random, int doorRadius) {
         int offset = random.nextInt(3) - 1;
 
         BlockPos doorPosBottom1 = pos;
         BlockPos outwardPos;
-
         switch (direction) {
             case NORTH, SOUTH -> {
-                int doorX = (width / 2) + offset; // Adjust door position along the width
+                int doorX = (width / 2) + offset;
                 doorPosBottom1 = pos.offset(doorX, 1, direction == Direction.NORTH ? 0 : length - 1);
                 outwardPos = doorPosBottom1.relative(direction == Direction.NORTH ? Direction.NORTH : Direction.SOUTH);
-
-                // Create a doorway with the specified radius
                 for (int i = -doorRadius; i <= doorRadius; i++) {
                     for (int j = -doorRadius; j <= doorRadius; j++) {
                         BlockPos doorPos = doorPosBottom1.offset(0, 0, j);
                         BlockPos doorPosTop = doorPos.above();
-
                         if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(outwardPos).getBlock())) {
-                            return; // Skip placing the doorway if blocked by a roof block
+                            return;
                         }
-                        if (!world.getBlockState(doorPos).is(Blocks.LADDER)){
+                        if (!world.getBlockState(doorPos).is(Blocks.LADDER)) {
                             world.setBlock(doorPos, Blocks.AIR.defaultBlockState(), 3);
                         }
-                        if (!world.getBlockState(doorPosTop).is(Blocks.LADDER)){
+                        if (!world.getBlockState(doorPosTop).is(Blocks.LADDER)) {
                             world.setBlock(doorPosTop, Blocks.AIR.defaultBlockState(), 3);
                         }
                     }
                 }
             }
             case EAST, WEST -> {
-                int doorZ = (length / 2) + offset; // Adjust door position along the length
+                int doorZ = (length / 2) + offset;
                 doorPosBottom1 = pos.offset(direction == Direction.WEST ? 0 : width - 1, 1, doorZ);
                 outwardPos = doorPosBottom1.relative(direction == Direction.WEST ? Direction.WEST : Direction.EAST);
-
-                // Create a doorway with the specified radius
                 for (int i = -doorRadius; i <= doorRadius; i++) {
                     BlockPos doorPos = doorPosBottom1.offset(0, 0, i);
                     BlockPos doorPosTop = doorPos.above();
-
                     if (Arrays.stream(ROOF_BLOCKS).toList().contains(world.getBlockState(outwardPos).getBlock())) {
-                        return; // Skip placing the doorway if blocked by a roof block
+                        return;
                     }
-
                     world.setBlock(doorPos, Blocks.AIR.defaultBlockState(), 3);
                     world.setBlock(doorPosTop, Blocks.AIR.defaultBlockState(), 3);
                 }
@@ -330,6 +455,17 @@ public class DungeonGenerator {
         }
     }
 
+    /**
+     * Calculates the position of the next room based on the current position, room dimensions, and the given {@link Direction}.
+     * The new position is offset in the specified direction to place the next room adjacent to the current one.
+     *
+     * @param pos       The current {@link BlockPos position} of the room.
+     * @param width     The width of the current room.
+     * @param length    The length of the current room.
+     * @param direction The {@link Direction} in which the next room will be placed (e.g., {@link Direction#NORTH NORTH}, {@link Direction#SOUTH SOUTH}, {@link Direction#EAST EAST}, {@link Direction#WEST WEST}).
+     * @return The {@link BlockPos position} of the next room.
+     * @throws IllegalStateException if the direction is not one of the expected values.
+     */
     private static BlockPos calculateNextRoomPos(BlockPos pos, int width, int length, Direction direction) {
         return switch (direction) {
             case NORTH -> pos.offset(0, 0, -length + 1);
@@ -340,6 +476,13 @@ public class DungeonGenerator {
         };
     }
 
+    /**
+     * Selects a random {@link Block} from the provided array of blocks using the given {@link RandomSource}.
+     *
+     * @param blocks The array of {@link Block blocks} to choose from.
+     * @param random The {@link RandomSource} used to select a random block.
+     * @return A randomly selected {@link Block} from the array.
+     */
     private static Block selectRandomBlock(Block[] blocks, RandomSource random) {
         return blocks[random.nextInt(blocks.length)];
     }

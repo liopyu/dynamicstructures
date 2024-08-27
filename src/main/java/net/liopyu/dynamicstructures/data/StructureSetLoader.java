@@ -18,12 +18,38 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * The {@code StructureSetLoader} class is responsible for loading structure spawning configurations
+ * from JSON files located in the "config/dynamicstructures/structure_set/" directory.
+ * These configurations define the spawning rules and parameters for structures in Minecraft.
+ *
+ * <p>This class provides methods to load spawn contexts from disk, cache them for reuse, and
+ * create default spawn context configurations if none are found. It supports recursive loading
+ * of JSON files from directories, enabling organized storage of spawning configuration files.</p>
+ *
+ * <p>The class uses the {@link ContextUtils.SpawnContext} class to represent the spawning attributes of structures.
+ * JSON files are parsed into {@link JsonObject} instances, which are then converted into
+ * {@link ContextUtils.SpawnContext} objects. The loaded spawn contexts are cached to avoid redundant
+ * loading operations.</p>
+ *
+ * <p><strong>Usage:</strong></p>
+ * <ul>
+ *   <li>{@link #loadStructures()} - Loads and caches spawn contexts from JSON files.</li>
+ *   <li>{@link #clearCache()} - Clears the cached spawn contexts, forcing a reload on the next access.</li>
+ * </ul>
+ */
 public class StructureSetLoader {
-    private static boolean structuresLoaded = false;
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structure_set/");
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    private static boolean structuresLoaded = false;
     private static List<ContextUtils.SpawnContext> cachedStructures = new ArrayList<>();
 
+    /**
+     * Loads structure spawn context configurations from the specified directory. If contexts have already
+     * been loaded, the cached list is returned. If no contexts are found, a default context is loaded.
+     *
+     * @return A list of loaded {@link ContextUtils.SpawnContext} objects.
+     */
     public static List<ContextUtils.SpawnContext> loadStructures() {
         if (structuresLoaded) {
             return cachedStructures;
@@ -36,17 +62,29 @@ public class StructureSetLoader {
         loadJsonFilesRecursively(STRUCTURE_DIR, cachedStructures);
 
         if (cachedStructures.isEmpty()) {
-            loadDefaultStructure( cachedStructures);
+            loadDefaultStructure(cachedStructures);
         }
 
         structuresLoaded = true;
         return cachedStructures;
     }
+
+    /**
+     * Clears the cache of loaded spawn contexts, allowing them to be reloaded from disk
+     * on the next call to {@link #loadStructures()}.
+     */
     public static void clearCache() {
         cachedStructures.clear();
         structuresLoaded = false;
     }
 
+    /**
+     * Recursively loads JSON files from the specified directory and converts them into
+     * {@link ContextUtils.SpawnContext} objects.
+     *
+     * @param directory  The directory to scan for JSON files.
+     * @param structures The list to store the loaded {@link ContextUtils.SpawnContext} objects.
+     */
     private static void loadJsonFilesRecursively(File directory, List<ContextUtils.SpawnContext> structures) {
         File[] files = directory.listFiles();
 
@@ -70,6 +108,12 @@ public class StructureSetLoader {
         }
     }
 
+    /**
+     * Loads a default structure spawn context configuration if no other contexts are found.
+     * The default context is defined in {@link #DEFAULT_STRUCTURE_FILE}.
+     *
+     * @param structures The list to store the loaded {@link ContextUtils.SpawnContext} objects.
+     */
     private static void loadDefaultStructure(List<ContextUtils.SpawnContext> structures) {
         try {
             if (!DEFAULT_STRUCTURE_FILE.exists()) {
@@ -89,6 +133,10 @@ public class StructureSetLoader {
         }
     }
 
+    /**
+     * Creates a default structure spawn context JSON file in the specified directory.
+     * This file is used if no other contexts are found.
+     */
     private static void createDefaultStructureFile() {
         Random random = new Random();
         int randomSalt = 1_000_000_000 + random.nextInt(1_000_000_000);
@@ -100,8 +148,8 @@ public class StructureSetLoader {
             writer.write("    \"Separation\": 7,\n");
             writer.write("    \"Spacing\": 8,\n");
             writer.write("    \"y Min\": -32,\n");
-            writer.write("    \"y Max\": 0\n");
-            writer.write("    \"Max Distance\": 35,\n");
+            writer.write("    \"y Max\": 0,\n");
+            writer.write("    \"Max Distance\": 35\n");
             writer.write("}\n");
         } catch (IOException e) {
             e.printStackTrace();

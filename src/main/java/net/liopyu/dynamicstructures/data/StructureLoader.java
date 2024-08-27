@@ -14,12 +14,41 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * The {@code StructureLoader} class is responsible for loading structure configurations
+ * from JSON files located in the "config/dynamicstructures/structures/" directory.
+ * These configurations define the structure's properties and are used during structure generation in Minecraft.
+ *
+ * <p>This class provides methods to load structures from disk, cache them for reuse, and
+ * create default structure configurations if none are found. It supports recursive loading
+ * of JSON files from directories, allowing for organized structure configuration storage.</p>
+ *
+ * <p>The class uses the {@link ContextUtils.StructureContext} class to represent the structure's attributes.
+ * JSON files are parsed into {@link JsonObject} instances, which are then converted into
+ * {@link ContextUtils.StructureContext} objects. The loaded structures are cached to avoid redundant
+ * loading operations.</p>
+ *
+ * <p><strong>Usage:</strong></p>
+ * <ul>
+ *   <li>{@link #loadStructures(ServerLevel, BlockPos)} - Loads and caches structures from JSON files.</li>
+ *   <li>{@link #clearCache()} - Clears the cached structures, forcing a reload on the next access.</li>
+ * </ul>
+ */
 public class StructureLoader {
-    private static boolean structuresLoaded = false;
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structures/");
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    private static boolean structuresLoaded = false;
     private static List<ContextUtils.StructureContext> cachedStructures = new ArrayList<>();
 
+    /**
+     * Loads structure configurations from the specified directory. If structures have already
+     * been loaded, the cached list is returned. If no structures are found, a default structure
+     * is loaded.
+     *
+     * @param level    The {@link ServerLevel} where the structures will be used.
+     * @param blockPos The starting position of the structure in the world.
+     * @return A list of loaded {@link ContextUtils.StructureContext} objects.
+     */
     public static List<ContextUtils.StructureContext> loadStructures(ServerLevel level, BlockPos blockPos) {
         if (structuresLoaded) {
             return cachedStructures;
@@ -39,11 +68,24 @@ public class StructureLoader {
         return cachedStructures;
     }
 
+    /**
+     * Clears the cache of loaded structures, allowing them to be reloaded from disk
+     * on the next call to {@link #loadStructures(ServerLevel, BlockPos)}.
+     */
     public static void clearCache() {
         cachedStructures.clear();
         structuresLoaded = false;
     }
 
+    /**
+     * Recursively loads JSON files from the specified directory and converts them into
+     * {@link ContextUtils.StructureContext} objects.
+     *
+     * @param directory  The directory to scan for JSON files.
+     * @param structures The list to store the loaded {@link ContextUtils.StructureContext} objects.
+     * @param level      The {@link ServerLevel} where the structures will be used.
+     * @param blockPos   The starting position of the structure in the world.
+     */
     private static void loadJsonFilesRecursively(File directory, List<ContextUtils.StructureContext> structures, ServerLevel level, BlockPos blockPos) {
         File[] files = directory.listFiles();
         if (files != null) {
@@ -66,6 +108,14 @@ public class StructureLoader {
         }
     }
 
+    /**
+     * Loads a default structure configuration if no other structures are found.
+     * The default structure is defined in {@link #DEFAULT_STRUCTURE_FILE}.
+     *
+     * @param level      The {@link ServerLevel} where the structures will be used.
+     * @param structures The list to store the loaded {@link ContextUtils.StructureContext} objects.
+     * @param blockPos   The starting position of the structure in the world.
+     */
     private static void loadDefaultStructure(ServerLevel level, List<ContextUtils.StructureContext> structures, BlockPos blockPos) {
         try {
             if (!DEFAULT_STRUCTURE_FILE.exists()) {
@@ -84,6 +134,10 @@ public class StructureLoader {
         }
     }
 
+    /**
+     * Creates a default structure JSON file in the specified directory. This file is used
+     * if no other structures are found.
+     */
     private static void createDefaultStructureFile() {
         try (FileWriter writer = new FileWriter(DEFAULT_STRUCTURE_FILE)) {
             writer.write("{\n");

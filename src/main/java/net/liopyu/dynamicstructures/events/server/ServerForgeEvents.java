@@ -18,16 +18,32 @@ import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraftforge.forgespi.Environment;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.*;
 
 import static net.liopyu.dynamicstructures.DynamicStructures.MODID;
 
 @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ServerForgeEvents {
+    /**
+     * Handles chunk initialization when a chunk is loaded, specifically for newly generated chunks.
+     * Subscribed to {@link ChunkEvent.Load}, this method dynamically triggers custom structure generation
+     * by leveraging {@link ServerForgeEvents#performIfLoaded(ServerLevel, BlockPos, Runnable)}. This allows for the addition or
+     * modification of structures based on runtime conditions, mimicking Minecraft's structure set logic.
+     * <p>
+     * The method checks if the chunk is new, retrieves the relevant {@link ServerLevel}, and then initiates
+     * structure generation if applicable. Utility methods like {@link #performFirstTimeLoadActionBoolean(BlockPos, ServerLevel)}
+     * and {@link #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)}
+     * assist in determining whether and how structures should be generated within the chunk.
+     *
+     * @param event The {@link ChunkEvent.Load} event providing context about the loaded chunk.
+     * @see ChunkEvent.Load
+     * @see #performIfLoaded(ServerLevel, BlockPos, Runnable)
+     * @see net.minecraft.world.level.levelgen.structure.StructureSet
+     */
     @SubscribeEvent
     public static void onChunkInit(ChunkEvent.Load event) {
         LevelAccessor levelAccessor = event.getLevel();
@@ -39,42 +55,63 @@ public class ServerForgeEvents {
                 ServerLevel serverLevel = server.getLevel(dimensionKey);
                 BlockPos pos = event.getChunk().getPos().getWorldPosition();
                 if (serverLevel != null) {
-                    performIfLoaded(serverLevel, pos);
+                    performIfLoaded(serverLevel, pos, () -> {
+                        DSHelperClass.logInfoMessage("Attempting to perform operation2");
+                        performFirstTimeLoadAction(serverLevel.getChunk(pos), serverLevel);
+                    });
                 } else {
-                    DSHelperClass.logInfoMessage("Warning: Unable to retrieve ServerLevel for dimension: " + dimensionKey.location());
+                    DSHelperClass.logWarningMessageOnce("Warning: Unable to retrieve ServerLevel for dimension: " + dimensionKey.location());
                 }
             } else {
-                DSHelperClass.logInfoMessage("Warning: Unable to retrieve MinecraftServer instance.");
+                DSHelperClass.logWarningMessageOnce("Warning: Unable to retrieve MinecraftServer instance.");
             }
         } else {
-            DSHelperClass.logInfoMessage("Warning: LevelAccessor is not an instance of Level.");
+            DSHelperClass.logWarningMessageOnce("Warning: LevelAccessor is not an instance of Level.");
         }
     }
 
     /**
-     * Asynchronously verifies if a {@link BlockPos} within a {@link ServerLevel} is loaded,
-     * executing a subsequent action on the server's main thread if true. This method enhances game performance
-     * by offloading the position check from the main game loop. Similar to other asynchronous operations in
-     * Minecraft such as {@link net.minecraft.world.level.chunk.ChunkStatus#generate}
-     * and {@link net.minecraft.world.level.chunk.ChunkStatus#load}, which manage chunk generation
-     * and loading, this method queues actions on the game state to the main thread, aligning with Vanilla Minecraft's
-     * best practices for concurrency and performance.
+     * Asynchronously checks if a {@link BlockPos} within a {@link ServerLevel} is loaded, and if so,
+     * executes the provided {@link Runnable} on the server's main thread. This method enhances game
+     * performance by offloading the position check from the main game loop, similar to other asynchronous
+     * operations in Minecraft.
+     *
+     * <p>If the specified position is determined to be loaded, the provided {@link Runnable} is executed
+     * on the server's main thread, ensuring that any game state modifications occur safely within the
+     * appropriate context.</p>
      *
      * @param serverLevel The server level where the operation is to be performed.
      * @param pos         The world position to check.
+     * @param runnable    The action to execute if the position is loaded.
+     * @see #performFirstTimeLoadActionBoolean(BlockPos, ServerLevel)
      */
-    public static void performIfLoaded(ServerLevel serverLevel, BlockPos pos) {
+    public static void performIfLoaded(ServerLevel serverLevel, BlockPos pos, Runnable runnable) {
         CompletableFuture.supplyAsync(() -> performFirstTimeLoadActionBoolean(pos, serverLevel))
                 .thenAcceptAsync(isLoaded -> {
                     if (isLoaded) {
-                        serverLevel.getServer().execute(() -> {
-                            DSHelperClass.logInfoMessage("Attempting to perform operation2");
-                            performFirstTimeLoadAction(serverLevel.getChunk(pos), serverLevel);
-                        });
+                        serverLevel.getServer().execute(runnable);
                     }
                 }, serverLevel.getServer());
     }
 
+    /**
+     * Determines whether a custom structure should be generated during the first-time loading of a chunk.
+     * This method loads structure contexts and spawn contexts, then evaluates whether the conditions for
+     * structure generation are met based on the chunk's position and configured parameters.
+     * <p>
+     * For each structure context, the method calculates a random Y-coordinate within the allowed range,
+     * sets the structure's start position, and checks if the structure should be generated using
+     * {@link #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)}.
+     * <p>
+     * If a structure is eligible for generation, the method returns {@code true}; otherwise, it returns {@code false}.
+     *
+     * @param pos         The position within the chunk to evaluate.
+     * @param serverLevel The server level where the chunk is located.
+     * @return {@code true} if the structure should be generated, {@code false} otherwise.
+     * @see #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)
+     * @see ContextUtils.SpawnContext
+     * @see ContextUtils.StructureContext
+     */
     public static boolean performFirstTimeLoadActionBoolean(BlockPos pos, ServerLevel serverLevel) {
         Random random = new Random();
         List<ContextUtils.SpawnContext> spawnContexts = StructureSetLoader.loadStructures();
@@ -98,6 +135,23 @@ public class ServerForgeEvents {
         return false;
     }
 
+    /**
+     * Executes the generation of custom structures within a chunk during its first-time load.
+     * This method retrieves the relevant structure contexts and spawn contexts, then iterates
+     * through them to determine which structures should be generated in the chunk.
+     * <p>
+     * For each structure context, it finds the corresponding spawn context and, if available,
+     * triggers the structure generation using {@link DungeonGenerator#generateDungeon(ContextUtils.StructureContext)}.
+     * <p>
+     * Logs informative messages to indicate whether a structure is successfully spawned or if
+     * the corresponding spawn context is missing.
+     *
+     * @param chunk The chunk in which the structure generation is to be performed.
+     * @param level The server level where the chunk is located.
+     * @see DungeonGenerator#generateDungeon(ContextUtils.StructureContext)
+     * @see ContextUtils.SpawnContext
+     * @see ContextUtils.StructureContext
+     */
     private static void performFirstTimeLoadAction(ChunkAccess chunk, ServerLevel level) {
         List<ContextUtils.SpawnContext> spawnContexts = StructureSetLoader.loadStructures();
         List<ContextUtils.StructureContext> structures = StructureLoader.loadStructures(level, chunk.getPos().getWorldPosition());
@@ -112,7 +166,19 @@ public class ServerForgeEvents {
         }
     }
 
-
+    /**
+     * Finds and returns the {@link ContextUtils.SpawnContext} corresponding to a given structure name.
+     * This method compares the derived structure name from the provided list of spawn contexts with
+     * the target structure name, matching them based on their paths.
+     * <p>
+     * If a matching spawn context is found, it is returned; otherwise, the method returns {@code null}.
+     *
+     * @param spawnContexts The list of {@link ContextUtils.SpawnContext} objects to search through.
+     * @param structureName The name of the structure for which the spawn context is being sought.
+     * @return The matching {@link ContextUtils.SpawnContext}, or {@code null} if no match is found.
+     * @see ContextUtils.SpawnContext
+     * @see DSHelperClass#deriveStructureNameFromPath(String, java.io.File)
+     */
     private static ContextUtils.SpawnContext findSpawnContextForStructure(List<ContextUtils.SpawnContext> spawnContexts, String structureName) {
         String structureNameFromPath = DSHelperClass.deriveStructureNameFromPath(structureName, StructureLoader.STRUCTURE_DIR);
         for (ContextUtils.SpawnContext context : spawnContexts) {
@@ -124,11 +190,37 @@ public class ServerForgeEvents {
         return null;
     }
 
+    /**
+     * Calculates the maximum size of a structure based on its base size and a size threshold.
+     * The size is adjusted by a percentage of the base size determined by the threshold.
+     *
+     * @param baseSize      The initial size of the structure.
+     * @param sizeThreshold The percentage threshold for size variation.
+     * @return The maximum size after applying the variation.
+     */
     public static int getMaxSize(int baseSize, int sizeThreshold) {
         int variation = (int) (baseSize * (sizeThreshold / 100.0));
         return baseSize + variation;
     }
 
+    /**
+     * Determines whether a structure should be generated in a specific chunk based on its configuration
+     * and position relative to other structures. The method checks several factors, including spacing,
+     * separation, and the bounding box of the structure, to ensure it is placed correctly without overlapping
+     * other structures or exceeding the loaded area.
+     * <p>
+     * The method uses {@link #getMaxSize(int, int)} to calculate the dimensions of the structure, which is
+     * essential for determining whether the structure fits within the chunk and its surrounding area.
+     *
+     * @param structureContext The context containing details about the structure to generate.
+     * @param spawnContext     The context for spawning conditions related to the structure.
+     * @param chunkPos         The position of the chunk being evaluated for structure generation.
+     * @param level            The server level where the structure generation is being evaluated.
+     * @param pos              The world position being evaluated for structure placement.
+     * @return {@code true} if the structure should be generated in the chunk; {@code false} otherwise.
+     * @see #getMaxSize(int, int)
+     * @see DungeonGenerator#getRandomSize(int, net.minecraft.util.RandomSource, int)
+     */
     public static boolean shouldGenerateStructure(ContextUtils.StructureContext structureContext, ContextUtils.SpawnContext spawnContext, ChunkPos chunkPos, ServerLevel level, BlockPos pos) {
         int width = getMaxSize(structureContext.getWidth(), structureContext.getSizeThreshold()) + 5;
         int length = getMaxSize(structureContext.getHeight(), structureContext.getSizeThreshold()) + 5;
@@ -139,77 +231,117 @@ public class ServerForgeEvents {
         int spacing = spawnContext.getSpacing();
         int maxDistanceFromCenter = spawnContext.getMaxDistanceFromCenter();
         long structureSeed = computeStructureSeed(seed, salt, chunkPos.x, chunkPos.z);
-
         int regionX = (chunkPos.x < 0) ? (chunkPos.x - spacing + 1) / spacing : chunkPos.x / spacing;
         int regionZ = (chunkPos.z < 0) ? (chunkPos.z - spacing + 1) / spacing : chunkPos.z / spacing;
-
         Random random = new Random(structureSeed);
         int originX = regionX * spacing + random.nextInt(spacing);
         int originZ = regionZ * spacing + random.nextInt(spacing);
-
-        // Calculate the furthest points from the center based on the structure dimensions and maxDistanceFromCenter
         BlockPos centerPos = new BlockPos(originX, pos.getY(), originZ);
         BlockPos furthestPos = centerPos.offset(width / 2 + maxDistanceFromCenter, height, length / 2 + maxDistanceFromCenter);
-
-        // Check if all relevant blocks from the structure's bounding box are loaded
         if (!level.isLoaded(furthestPos)) {
-            return false; // Do not generate the structure if the furthest block is not loaded
+            return false;
         }
-
-        // Verify that the chunk coordinates match the intended origin and that the surrounding area is clear
         int minX = originX - separation;
         int maxX = originX + separation;
         int minZ = originZ - separation;
         int maxZ = originZ + separation;
-
         if (chunkPos.x == originX && chunkPos.z == originZ) {
-            return true; // This chunk is the origin for the structure
+            return true;
         } else if (chunkPos.x >= minX && chunkPos.x <= maxX && chunkPos.z >= minZ && chunkPos.z <= maxZ) {
-            return false; // This chunk is within the separation bounds but is not the origin
+            return false;
         }
-
-        return false; // Default to not generating if all checks fail
+        return false;
     }
 
-    public static List<ChunkPos> findPotentialStructurePositions(ContextUtils.SpawnContext spawnContext, ChunkPos centerChunk, ServerLevel level, int limit) {
-        long seed = level.getSeed();
-        long salt = spawnContext.getSalt();
-        int separation = spawnContext.getSeparation();
-        int spacing = spawnContext.getSpacing();
-        List<ChunkPos> positions = new ArrayList<>();
+    /**
+     * Computes a unique seed for structure generation based on the world seed, a salt value,
+     * and the chunk coordinates. This seed is used to ensure consistent and reproducible
+     * structure placement within the world.
+     *
+     * @param worldSeed The seed of the world.
+     * @param salt      An additional salt value to add randomness.
+     * @param chunkX    The X coordinate of the chunk.
+     * @param chunkZ    The Z coordinate of the chunk.
+     * @return A long value representing the computed structure seed.
+     */
+    private static long computeStructureSeed(long worldSeed, long salt, int chunkX, int chunkZ) {
+        return worldSeed + salt + chunkX * 2345803L + chunkZ * 9236449L + (long) chunkX * chunkZ * 223;
+    }
 
-        int gridSize = (int) Math.ceil(Math.sqrt(limit));
+    /**
+     * Finds and returns a list of chunk positions within a specified radius around a center chunk
+     * where a given structure is eligible to generate. The method checks each chunk within the square
+     * radius and determines if the structure should spawn there based on the provided
+     * {@link ContextUtils.StructureContext} and {@link ContextUtils.SpawnContext}.
+     *
+     * @param structureContext The context containing details about the structure to generate.
+     * @param spawnContext     The context for spawning conditions related to the structure.
+     * @param centerChunk      The central chunk position from which the radius is calculated.
+     * @param level            The server level where the chunks are located.
+     * @param limit            The radius around the center chunk within which to search for potential structure positions.
+     * @return A list of {@link ChunkPos} representing the chunk positions where the structure can spawn.
+     * @see #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)
+     */
+    public static List<ChunkPos> findPotentialStructurePositions(ContextUtils.StructureContext structureContext, ContextUtils.SpawnContext spawnContext, ChunkPos centerChunk, ServerLevel level, int limit) {
+        List<ChunkPos> potentialPositions = new ArrayList<>();
+        int minX = centerChunk.x - limit;
+        int maxX = centerChunk.x + limit;
+        int minZ = centerChunk.z - limit;
+        int maxZ = centerChunk.z + limit;
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                ChunkPos chunkPos = new ChunkPos(x, z);
+                BlockPos dummyPos = chunkPos.getWorldPosition();
+                if (shouldGenerateStructure(structureContext, spawnContext, chunkPos, level, dummyPos)) {
+                    potentialPositions.add(chunkPos);
+                }
+            }
+        }
+        return potentialPositions;
+    }
 
-        int regionCenterX = centerChunk.x / spacing;
-        int regionCenterZ = centerChunk.z / spacing;
-
-        for (int dx = -gridSize; dx <= gridSize; dx++) {
-            for (int dz = -gridSize; dz <= gridSize; dz++) {
-                int regionX = regionCenterX + dx;
-                int regionZ = regionCenterZ + dz;
-
-                long structureSeed = computeStructureSeed(seed, salt, regionX, regionZ);
-                Random random = new Random(structureSeed);
-
-                int originX = regionX * spacing + random.nextInt(spacing);
-                int originZ = regionZ * spacing + random.nextInt(spacing);
-
-                ChunkPos originChunkPos = new ChunkPos(originX, originZ);
-                if (!positions.contains(originChunkPos)) {
-                    positions.add(originChunkPos);
-                    if (positions.size() >= limit) {
-                        return positions;
+    /**
+     * Searches for the nearest structure that matches a given name within a maximum distance of 100,000 blocks
+     * from a specified central position. The method compares the provided structure name against both
+     * {@link ContextUtils.StructureContext#getStructureName()} and {@link ContextUtils.SpawnContext#getName()},
+     * and checks if the structure is eligible to generate in each chunk within the search area.
+     *
+     * <p>The search iterates over chunk positions, expanding outward from the central position, and
+     * identifies the closest matching structure that can be generated. If a structure is found within
+     * the search limits, its position is returned; otherwise, an empty result is provided.</p>
+     *
+     * @param structureName    The name of the structure to search for.
+     * @param structureContext The context containing details about the structure to generate.
+     * @param spawnContext     The context for spawning conditions related to the structure.
+     * @param level            The server level where the search is being conducted.
+     * @param searchPos        The central position from which the search begins.
+     * @return An {@link Optional} containing the {@link BlockPos} of the nearest structure if found, or {@link Optional#empty()} if not found.
+     * @see ContextUtils.StructureContext#getStructureName()
+     * @see ContextUtils.SpawnContext#getName()
+     * @see #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)
+     */
+    public static Optional<BlockPos> findNearestStructure(String structureName, ContextUtils.StructureContext structureContext, ContextUtils.SpawnContext spawnContext, ServerLevel level, BlockPos searchPos) {
+        BlockPos nearestPos = null;
+        double nearestDistance = Double.MAX_VALUE;
+        final int maxDistance = 100000;
+        for (int x = searchPos.getX() - maxDistance; x <= searchPos.getX() + maxDistance; x += 16) {
+            for (int z = searchPos.getZ() - maxDistance; z <= searchPos.getZ() + maxDistance; z += 16) {
+                ChunkPos chunkPos = new ChunkPos(new BlockPos(x, 0, z));
+                if (structureName.equals(structureContext.getStructureName()) || structureName.equals(spawnContext.getName())) {
+                    BlockPos dummyPos = chunkPos.getWorldPosition();
+                    if (shouldGenerateStructure(structureContext, spawnContext, chunkPos, level, dummyPos)) {
+                        double distance = searchPos.distSqr(dummyPos);
+                        if (distance < nearestDistance && distance <= maxDistance * maxDistance) {
+                            nearestDistance = distance;
+                            nearestPos = dummyPos;
+                        }
                     }
                 }
             }
         }
-
-        return positions;
+        return Optional.ofNullable(nearestPos);
     }
 
-    private static long computeStructureSeed(long worldSeed, long salt, int chunkX, int chunkZ) {
-        return worldSeed + salt + chunkX * 2345803L + chunkZ * 9236449L + (long) chunkX * chunkZ * 223;
-    }
 
     @SubscribeEvent
     public static void onRightClicked(PlayerInteractEvent.RightClickItem event) {
@@ -217,31 +349,26 @@ public class ServerForgeEvents {
     }
 
     public static void doRightClick(PlayerInteractEvent.RightClickItem event) {
+        if (!Objects.equals(event.getEntity().getName().toString(), "Liopyu") &&
+                FMLEnvironment.production) return;
         var blockPos = event.getPos();
         if (!event.getLevel().isClientSide()) {
             var serverLevel = (ServerLevel) event.getLevel();
-            /*List<ContextUtils.StructureContext> structures = StructureLoader.loadStructures(serverLevel,blockPos);
-            // Optionally find a specific structure
-            for (ContextUtils.StructureContext context : structures) {
-                if ("test".equals(context.getStructureName())) {
-                    *//*DungeonGenerator.generateDungeon(context);*//*
-                    break;
-                }
-            }
+            List<ContextUtils.StructureContext> structures = StructureLoader.loadStructures(serverLevel, blockPos);
             List<ContextUtils.SpawnContext> structuresSets = StructureSetLoader.loadStructures();
-            // Optionally find a specific structure
             for (ContextUtils.SpawnContext context : structuresSets) {
                 if ("test".equals(context.getName())) {
-                    findPotentialStructurePositions(context,serverLevel.getChunk(blockPos).getPos(),serverLevel,100);
-                    *//*DungeonGenerator.generateDungeon(context);*//*
-                    break;
+                    for (ContextUtils.StructureContext structureContext : structures) {
+                        if ("test".equals(structureContext.getStructureName())) {
+                            findPotentialStructurePositions(structureContext,
+                                    context,
+                                    serverLevel.getChunk(blockPos).getPos(),
+                                    serverLevel, 100);
+                            break;
+                        }
+                    }
                 }
-            }*/
+            }
         }
-    }
-
-    @SubscribeEvent
-    public static void onServerStarting(ServerStartingEvent event) {
-        // You can access the structure context here if needed
     }
 }
