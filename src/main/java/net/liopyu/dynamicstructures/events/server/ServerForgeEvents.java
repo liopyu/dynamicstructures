@@ -357,15 +357,15 @@ public class ServerForgeEvents {
             var spawnContext = DSHelperClass.getSpawnContext("test");
             StructureLoader.loadStructures().keySet().forEach(DSHelperClass::logInfoMessage);
             StructureLoader.loadStructures().values().forEach(context -> DSHelperClass.logInfoMessage(context.getStructureName()));
-           /* var list = findPotentialStructurePositions(structureContext,
+            var list = findPotentialStructurePositions(structureContext,
                     spawnContext,
                     serverLevel.getChunk(blockPos).getPos(),
                     serverLevel,
-                    10
+                    1000
             );
             var nearestStructurePos = findNearestStructure("test", structureContext, spawnContext, serverLevel, blockPos);
-            DSHelperClass.logInfoMessage(nearestStructurePos.get().toString());*/
-            //list.forEach(position -> DSHelperClass.logInfoMessage(position.toString()));
+            //DSHelperClass.logInfoMessage(nearestStructurePos.get().toString());
+            list.forEach(position -> DSHelperClass.logInfoMessage(position.toString()));
         }
     }
 

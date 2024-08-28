@@ -7,21 +7,115 @@ import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraftforge.registries.ForgeRegistries;
+import org.apache.logging.log4j.Level;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
+import static net.liopyu.dynamicstructures.util.BlockInterpreter.allowedKeywords;
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class ContextUtils {
+    public static class BlockContext {
+        private final JsonObject json;
+        private ServerLevel level;
+        private BlockPos pos;
+        private List<Block> floorBlocks;
+        private List<Block> roofBlocks;
+        private List<Block> wallBlocks;
+        private Map<BlockInterpreter.BlockType, JsonObject> predicates;
+
+        public BlockContext(JsonObject json) {
+            this.json = json;
+            normalizeJson(json);
+            for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
+                String key = entry.getKey().toLowerCase();
+                if (allowedKeywords.contains(key)) {
+                    System.out.println(key);
+                    JsonObject categoryObject = entry.getValue().getAsJsonObject();
+                    JsonArray blockArray = categoryObject.getAsJsonArray("Blocks");
+                    if (blockArray != null) {
+                        for (int i = 0; i < blockArray.size(); i++) {
+                            JsonObject blockObject = blockArray.get(i).getAsJsonObject();
+                            String name = blockObject.get("block").getAsString();
+                            switch (key) {
+                                case "floor":
+                                    predicates.put(BlockInterpreter.BlockType.FLOOR, normalizeJson(blockObject.getAsJsonObject("Predicate")));
+                                    floorBlocks.add(ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name)));
+                                    break;
+                                case "roof":
+                                    predicates.put(BlockInterpreter.BlockType.ROOF, normalizeJson(blockObject.getAsJsonObject("Predicate")));
+                                    roofBlocks.add(ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name)));
+                                    break;
+                                case "wall":
+                                    predicates.put(BlockInterpreter.BlockType.WALL, normalizeJson(blockObject.getAsJsonObject("Predicate")));
+                                    wallBlocks.add(ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name)));
+                                    break;
+                            }
+
+
+                        }
+                    } else {
+
+                    }
+                }
+            }
+        }
+
+        public Map<BlockInterpreter.BlockType, JsonObject> getPredicates() {
+            return predicates;
+        }
+
+        public void setPredicates(Map<BlockInterpreter.BlockType, JsonObject> predicates) {
+            this.predicates = predicates;
+        }
+
+        public List<Block> getWallBlocks() {
+            return wallBlocks;
+        }
+
+        public List<Block> getFloorBlocks() {
+            return floorBlocks;
+        }
+
+        public List<Block> getRoofBlocks() {
+            return roofBlocks;
+        }
+
+        public JsonObject getJson() {
+            return json;
+        }
+
+        public ServerLevel getLevel() {
+            return level;
+        }
+
+        public void setLevel(ServerLevel level) {
+            this.level = level;
+        }
+
+        public BlockPos getPos() {
+            return pos;
+        }
+
+        public void setPos(BlockPos pos) {
+            this.pos = pos;
+        }
+    }
+
     /**
      * The {@code ContextUtils$StructureContext} class is a static nested class within {@link ContextUtils}.
      * It encapsulates the context and configuration needed for generating a structure within a Minecraft world.
@@ -51,6 +145,7 @@ public class ContextUtils {
         private final int sizeThreshold;
         private final List<EntityType<?>> potentialSpawns;
         private BlockPos startPos;
+        private BlockContext blockContext;
 
         /**
          * Constructs a {@code ContextUtils$StructureContext} with the specified parameters.
@@ -90,10 +185,11 @@ public class ContextUtils {
          */
         public static StructureContext fromJson(JsonObject json, String jsonFilePath) {
             JsonObject normalizedJson = normalizeJson(json);
+            var blockContext = new BlockContext(normalizedJson);
             String structureName = normalizedJson.has("structure name") ? normalizedJson.get("structure name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureLoader.STRUCTURE_DIR);
             if (!normalizedJson.has("structure name")) {
-                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to `" + structureName + "'.");
+                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
             }
             float ladderChance = normalizedJson.has("ladder chance") ? normalizedJson.get("ladder chance").getAsFloat() : DSHelperClass.logDefault("Ladder Chance", DEFAULT_LADDER_CHANCE, jsonFilePath);
             int roomCount = normalizedJson.has("room count") ? normalizedJson.get("room count").getAsInt() : DSHelperClass.logDefault("Room Count", DEFAULT_ROOM_COUNT, jsonFilePath);
@@ -114,7 +210,7 @@ public class ContextUtils {
                 spawnerEntities = DEFAULT_SPAWNER_ENTITIES;
                 DSHelperClass.logWarningMessageOnce("Spawner Entities is missing or null in " + jsonFilePath + ". Defaulting to " + DEFAULT_SPAWNER_ENTITIES + ".");
             }
-            return new StructureContext(
+            var structure = new StructureContext(
                     structureName,
                     ladderChance,
                     roomCount,
@@ -126,7 +222,18 @@ public class ContextUtils {
                     spawnerEntities,
                     sizeThreshold
             );
+            structure.setBlockContext(new BlockContext(normalizedJson));
+            return structure;
         }
+
+        public BlockContext getBlockContext() {
+            return blockContext;
+        }
+
+        public void setBlockContext(BlockContext blockContext) {
+            this.blockContext = blockContext;
+        }
+
 
         /**
          * Gets the size threshold, which determines the percentage variation allowed in room size.
@@ -310,7 +417,7 @@ public class ContextUtils {
             String structureName = normalizedJson.has("structure name") ? normalizedJson.get("structure name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureSetLoader.STRUCTURE_DIR);
             if (!normalizedJson.has("structure name")) {
-                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in " + jsonFilePath + ". Defaulting to '" + structureName + "'.");
+                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
             }
             long salt = normalizedJson.has("salt") ? normalizedJson.get("salt").getAsLong() : DSHelperClass.logDefault("Salt", DEFAULT_SALT, jsonFilePath);
             int separation = normalizedJson.has("separation") ? normalizedJson.get("separation").getAsInt() : DSHelperClass.logDefault("Separation", DEFAULT_SEPARATION, jsonFilePath);

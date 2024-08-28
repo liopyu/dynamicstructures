@@ -1,5 +1,6 @@
 package net.liopyu.dynamicstructures.util;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.liopyu.dynamicstructures.DynamicStructures;
