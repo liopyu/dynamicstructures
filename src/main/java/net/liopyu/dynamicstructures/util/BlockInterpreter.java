@@ -18,27 +18,25 @@ import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 public class BlockInterpreter {
     public static List<String> allowedKeywords = new ArrayList<>();
 
-    static {
-        allowedKeywords.add("wall");
-        allowedKeywords.add("floor");
-        allowedKeywords.add("roof");
-    }
 
-    public static boolean evaluateConditions(ContextUtils.BlockContext context, BlockType blockType) {
-        String currentBiome = context.getLevel().getBiome(context.getPos()).get().toString();
+    public static boolean evaluateConditions(BlockType blockType, ContextUtils.BlockContext context) {
+        var currentBiome = (context.getLevel().getBiome(context.getPos())).get();
+        var biomeKey = context.getLevel().registryAccess().registryOrThrow(ForgeRegistries.BIOMES.getRegistryKey());
+        var biomeName = biomeKey.getKey(currentBiome).toString();
         int currentHeight = context.getPos().getY();
         String currentBlock = ForgeRegistries.BLOCKS.getKey(context.getLevel().getBlockState(context.getPos()).getBlock()).toString();
+
         boolean biomeConditionMet = true;
         boolean heightConditionMet = true;
         boolean existingBlockConditionMet = true;
-        if (context.getPredicates().isEmpty()) return true;
-        for (Map.Entry<BlockInterpreter.BlockType, JsonObject> predicateObject : context.getPredicates().entrySet()) {
+        if (!context.getPredicates().containsKey(blockType)) return true;
+        for (Map.Entry<BlockType, JsonObject> predicateObject : context.getPredicates().entrySet()) {
             if (predicateObject.getKey() == blockType) {
                 if (predicateObject.getValue().has("biomes")) {
                     JsonArray biomesArray = predicateObject.getValue().getAsJsonArray("biomes");
                     biomeConditionMet = false;
                     for (JsonElement biomeElement : biomesArray) {
-                        if (biomeElement.getAsString().equals(currentBiome)) {
+                        if (biomeElement.getAsString().equalsIgnoreCase(biomeName.toLowerCase())) {
                             biomeConditionMet = true;
                             break;
                         }
@@ -46,7 +44,6 @@ public class BlockInterpreter {
                 }
                 if (predicateObject.getValue().has("height")) {
                     JsonObject heightObject = normalizeJson(predicateObject.getValue().getAsJsonObject("height"));
-                    System.out.println("height: " + heightObject);
                     int minHeight = heightObject.has("min") ? heightObject.get("min").getAsInt() : Integer.MIN_VALUE;
                     int maxHeight = heightObject.has("max") ? heightObject.get("max").getAsInt() : Integer.MAX_VALUE;
                     heightConditionMet = currentHeight >= minHeight && currentHeight <= maxHeight;
@@ -54,7 +51,7 @@ public class BlockInterpreter {
 
                 if (predicateObject.getValue().has("existing_block")) {
                     String existingBlock = predicateObject.getValue().get("existing_block").getAsString();
-                    existingBlockConditionMet = existingBlock.equals(currentBlock);
+                    existingBlockConditionMet = existingBlock.equalsIgnoreCase(currentBlock);
                 }
             }
             return biomeConditionMet && heightConditionMet && existingBlockConditionMet;
@@ -91,12 +88,6 @@ public class BlockInterpreter {
         }*/
     }
 
-    public enum BlockType {
-        WALL,
-        FLOOR,
-        ROOF,
-        CENTER
-    }
 
     public static class BlockEntry {
         private final String name;
@@ -106,23 +97,7 @@ public class BlockInterpreter {
         public BlockEntry(String name, boolean shouldPlace, String type) {
             this.name = name;
             this.shouldPlace = shouldPlace;
-            switch (type.toLowerCase()) {
-                case "wall":
-                    this.type = BlockType.WALL;
-                    break;
-                case "floor":
-                    this.type = BlockType.FLOOR;
-                    break;
-                case "roof":
-                    this.type = BlockType.ROOF;
-                    break;
-                case "center":
-                    this.type = BlockType.CENTER;
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown type: " + type);
-            }
-
+            this.type = BlockType.valueOf(type);
         }
 
         public String getName() {

@@ -10,20 +10,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraftforge.registries.ForgeRegistries;
-import org.apache.logging.log4j.Level;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 import static net.liopyu.dynamicstructures.util.BlockInterpreter.allowedKeywords;
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
@@ -33,66 +23,55 @@ public class ContextUtils {
         private final JsonObject json;
         private ServerLevel level;
         private BlockPos pos;
-        private List<Block> floorBlocks;
-        private List<Block> roofBlocks;
-        private List<Block> wallBlocks;
-        private Map<BlockInterpreter.BlockType, JsonObject> predicates;
+        private Map<BlockType, List<Block>> blocks = new HashMap<>();
+        private Map<BlockType, JsonObject> predicates = new HashMap<>();
 
-        public BlockContext(JsonObject json) {
-            this.json = json;
-            normalizeJson(json);
-            for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
+        public BlockContext(JsonObject normalizedJson) {
+            this.json = normalizedJson;
+            for (Map.Entry<String, JsonElement> entry : normalizedJson.entrySet()) {
                 String key = entry.getKey().toLowerCase();
                 if (allowedKeywords.contains(key)) {
-                    System.out.println(key);
+                    DSHelperClass.logInfoMessage(entry.getKey());
+                    List<Block> list = new ArrayList<>();
                     JsonObject categoryObject = entry.getValue().getAsJsonObject();
                     JsonArray blockArray = categoryObject.getAsJsonArray("Blocks");
                     if (blockArray != null) {
                         for (int i = 0; i < blockArray.size(); i++) {
                             JsonObject blockObject = blockArray.get(i).getAsJsonObject();
                             String name = blockObject.get("block").getAsString();
-                            switch (key) {
-                                case "floor":
-                                    predicates.put(BlockInterpreter.BlockType.FLOOR, normalizeJson(blockObject.getAsJsonObject("Predicate")));
-                                    floorBlocks.add(ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name)));
-                                    break;
-                                case "roof":
-                                    predicates.put(BlockInterpreter.BlockType.ROOF, normalizeJson(blockObject.getAsJsonObject("Predicate")));
-                                    roofBlocks.add(ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name)));
-                                    break;
-                                case "wall":
-                                    predicates.put(BlockInterpreter.BlockType.WALL, normalizeJson(blockObject.getAsJsonObject("Predicate")));
-                                    wallBlocks.add(ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name)));
-                                    break;
-                            }
 
+                            Arrays.stream(BlockType.values()).toList().forEach(blockType -> {
+                                predicates.put(blockType, normalizeJson(blockObject.getAsJsonObject("Predicate")));
+                                if (key.equalsIgnoreCase(blockType.name())) {
+                                    DSHelperClass.logInfoMessage("Adding '" + name + "' to [" + key + "] list.");
+                                    var block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
+                                    list.add(block);
 
+                                    blocks.put(blockType, list);
+                                } else {
+                                    blocks.put(blockType, list);
+                                }
+                            });
                         }
-                    } else {
-
                     }
                 }
             }
         }
 
-        public Map<BlockInterpreter.BlockType, JsonObject> getPredicates() {
+        public Map<BlockType, List<Block>> getBlocks() {
+            return blocks;
+        }
+
+        public void setBlocks(Map<BlockType, List<Block>> blocks) {
+            this.blocks = blocks;
+        }
+
+        public Map<BlockType, JsonObject> getPredicates() {
             return predicates;
         }
 
-        public void setPredicates(Map<BlockInterpreter.BlockType, JsonObject> predicates) {
+        public void setPredicates(Map<BlockType, JsonObject> predicates) {
             this.predicates = predicates;
-        }
-
-        public List<Block> getWallBlocks() {
-            return wallBlocks;
-        }
-
-        public List<Block> getFloorBlocks() {
-            return floorBlocks;
-        }
-
-        public List<Block> getRoofBlocks() {
-            return roofBlocks;
         }
 
         public JsonObject getJson() {
@@ -222,7 +201,7 @@ public class ContextUtils {
                     spawnerEntities,
                     sizeThreshold
             );
-            structure.setBlockContext(new BlockContext(normalizedJson));
+            structure.setBlockContext(blockContext);
             return structure;
         }
 

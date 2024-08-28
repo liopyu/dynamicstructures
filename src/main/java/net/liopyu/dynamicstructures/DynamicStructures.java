@@ -5,7 +5,10 @@ import com.mojang.logging.LogUtils;
 import net.liopyu.dynamicstructures.commands.FindStructureCommand;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
+import net.liopyu.dynamicstructures.util.BlockInterpreter;
+import net.liopyu.dynamicstructures.util.BlockType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
+import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -32,6 +35,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.*;
 import org.slf4j.Logger;
 
+import java.util.Arrays;
+
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(DynamicStructures.MODID)
 public class DynamicStructures {
@@ -41,8 +46,6 @@ public class DynamicStructures {
     public DynamicStructures() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        StructureSetLoader.loadStructures();
-        StructureLoader.loadStructures();
         modEventBus.addListener(this::commonSetup);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
@@ -50,5 +53,10 @@ public class DynamicStructures {
 
     @SubscribeEvent
     public void commonSetup(final FMLCommonSetupEvent event) {
+        Arrays.stream(BlockType.values()).toList().forEach(blockType -> {
+            BlockInterpreter.allowedKeywords.add(blockType.name().toLowerCase());
+        });
+        StructureSetLoader.loadStructures();
+        StructureLoader.loadStructures();
     }
 }

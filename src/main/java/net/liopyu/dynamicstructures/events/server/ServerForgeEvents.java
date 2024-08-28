@@ -9,6 +9,7 @@ import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -23,6 +24,7 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -355,7 +357,8 @@ public class ServerForgeEvents {
             var serverLevel = (ServerLevel) event.getLevel();
             var structureContext = DSHelperClass.getStructureContext("test");
             var spawnContext = DSHelperClass.getSpawnContext("test");
-            StructureLoader.loadStructures().keySet().forEach(DSHelperClass::logInfoMessage);
+
+            /*StructureLoader.loadStructures().keySet().forEach(DSHelperClass::logInfoMessage);
             StructureLoader.loadStructures().values().forEach(context -> DSHelperClass.logInfoMessage(context.getStructureName()));
             var list = findPotentialStructurePositions(structureContext,
                     spawnContext,
@@ -365,7 +368,7 @@ public class ServerForgeEvents {
             );
             var nearestStructurePos = findNearestStructure("test", structureContext, spawnContext, serverLevel, blockPos);
             //DSHelperClass.logInfoMessage(nearestStructurePos.get().toString());
-            list.forEach(position -> DSHelperClass.logInfoMessage(position.toString()));
+            list.forEach(position -> DSHelperClass.logInfoMessage(position.toString()));*/
         }
     }
 

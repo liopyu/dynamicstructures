@@ -1,6 +1,7 @@
 package net.liopyu.dynamicstructures.structures;
 
 import net.liopyu.dynamicstructures.util.BlockInterpreter;
+import net.liopyu.dynamicstructures.util.BlockType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
@@ -16,19 +17,38 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class Dungeon {
+    public static final Block[] WALL_BLOCKS = {
+            Blocks.OAK_PLANKS, Blocks.STONE_BRICKS, Blocks.BRICKS, Blocks.COBBLESTONE
+    };
+    public static final Block[] FLOOR_BLOCKS = {
+            Blocks.STONE, Blocks.SMOOTH_STONE, Blocks.OAK_PLANKS, Blocks.COBBLESTONE
+    };
+    public static final Block[] ROOF_BLOCKS = {
+            Blocks.OAK_SLAB, Blocks.BRICK_SLAB, Blocks.STONE_SLAB, Blocks.COBBLESTONE_SLAB
+    };
+    public static final Block[] CENTER_BLOCKS = {
+            Blocks.AIR
+    };
+    public static final Block[] FILLER_BLOCKS = {
+            Blocks.AIR
+    };
+    public static final Block[] DOORWAY_BLOCKS = {
+            Blocks.AIR
+    };
     protected static int defaultDoorwayRadius = 3;
     public final ContextUtils.StructureContext structureContext;
     public final ServerLevel level;
+    public Block floorBlock;
+    public Block wallBlock;
+    public Block roofBlock;
+    public Block centerBlock;
+    public Block doorwayBlock;
+    public Block fillerBlock;
     public BlockPos currentPosition;
-    private List<Block> WALL_BLOCKS;
-    private List<Block> FLOOR_BLOCKS;
-    private List<Block> ROOF_BLOCKS;
+    public Map<BlockType, Block> blocks;
 
     /**
      * Constructs a new {@code Dungeon} instance with the given {@link ContextUtils.StructureContext} and {@link ServerLevel}.
@@ -41,30 +61,54 @@ public class Dungeon {
     public Dungeon(ContextUtils.StructureContext structureContext, ServerLevel level) {
         this.structureContext = structureContext;
         this.level = level;
+        var random = level.random;
         getStructureContext().getBlockContext().setLevel(level);
-        if (!getStructureContext().getBlockContext().getWallBlocks().isEmpty()) {
-            WALL_BLOCKS = getStructureContext().getBlockContext().getWallBlocks();
-        } else {
-            WALL_BLOCKS.add(Blocks.OAK_PLANKS);
-            WALL_BLOCKS.add(Blocks.STONE_BRICKS);
-            WALL_BLOCKS.add(Blocks.BRICKS);
-            WALL_BLOCKS.add(Blocks.COBBLESTONE);
-        }
-        if (!getStructureContext().getBlockContext().getFloorBlocks().isEmpty()) {
-            FLOOR_BLOCKS = getStructureContext().getBlockContext().getFloorBlocks();
-        } else {
-            FLOOR_BLOCKS.add(Blocks.STONE);
-            FLOOR_BLOCKS.add(Blocks.SMOOTH_STONE);
-            FLOOR_BLOCKS.add(Blocks.OAK_PLANKS);
-            FLOOR_BLOCKS.add(Blocks.COBBLESTONE);
-        }
-        if (!getStructureContext().getBlockContext().getRoofBlocks().isEmpty()) {
-            ROOF_BLOCKS = getStructureContext().getBlockContext().getRoofBlocks();
-        } else {
-            ROOF_BLOCKS.add(Blocks.OAK_SLAB);
-            ROOF_BLOCKS.add(Blocks.STONE_SLAB);
-            ROOF_BLOCKS.add(Blocks.BRICK_SLAB);
-            ROOF_BLOCKS.add(Blocks.COBBLESTONE_SLAB);
+        for (Map.Entry<BlockType, List<Block>> entry : getStructureContext().getBlockContext().getBlocks().entrySet()) {
+            boolean found = entry.getValue().isEmpty();
+            switch (entry.getKey()) {
+                case ROOF -> {
+                    if (found) {
+                        roofBlock = selectRandomBlock(entry.getValue(), random);
+                    } else {
+                        roofBlock = selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random);
+                    }
+                }
+                case WALL -> {
+                    if (found) {
+                        wallBlock = selectRandomBlock(entry.getValue(), random);
+                    } else {
+                        wallBlock = selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random);
+                    }
+                }
+                case FLOOR -> {
+                    if (found) {
+                        floorBlock = selectRandomBlock(entry.getValue(), random);
+                    } else {
+                        floorBlock = selectRandomBlock(Arrays.stream(FLOOR_BLOCKS).toList(), random);
+                    }
+                }
+                case FILLER -> {
+                    if (found) {
+                        fillerBlock = selectRandomBlock(entry.getValue(), random);
+                    } else {
+                        fillerBlock = selectRandomBlock(Arrays.stream(FILLER_BLOCKS).toList(), random);
+                    }
+                }
+                case DOORWAY -> {
+                    if (found) {
+                        doorwayBlock = selectRandomBlock(entry.getValue(), random);
+                    } else {
+                        doorwayBlock = selectRandomBlock(Arrays.stream(DOORWAY_BLOCKS).toList(), random);
+                    }
+                }
+                case CENTER -> {
+                    if (found) {
+                        centerBlock = selectRandomBlock(entry.getValue(), random);
+                    } else {
+                        centerBlock = selectRandomBlock(Arrays.stream(CENTER_BLOCKS).toList(), random);
+                    }
+                }
+            }
         }
     }
 
@@ -111,12 +155,7 @@ public class Dungeon {
             int z = pos.getZ() + random.nextInt(length);
             BlockPos spawnerPos = new BlockPos(x, y, z);
             EntityType<?> entityType = potentialSpawns.get(random.nextInt(potentialSpawns.size()));
-            getStructureContext().getBlockContext().setPos(spawnerPos);
-            boolean placeBlock = BlockInterpreter.evaluateConditions(getStructureContext().getBlockContext());
-            if (placeBlock) {
-                setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3);
-            }
-
+            setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3, BlockType.CENTER);
             BlockEntity blockEntity = world.getBlockEntity(spawnerPos);
             if (blockEntity instanceof SpawnerBlockEntity spawnerEntity) {
                 spawnerEntity.getSpawner().setEntityId(entityType, world, world.random, spawnerPos);
@@ -124,9 +163,9 @@ public class Dungeon {
         }
     }
 
-    public void setBlock(BlockPos pPos, BlockState pNewState, int pFlags) {
+    public void setBlock(BlockPos pPos, BlockState pNewState, int pFlags, BlockType blockType) {
         getStructureContext().getBlockContext().setPos(pPos);
-        boolean placeBlock = BlockInterpreter.evaluateConditions(getStructureContext().getBlockContext());
+        boolean placeBlock = BlockInterpreter.evaluateConditions(blockType, getStructureContext().getBlockContext());
         if (placeBlock) {
             this.getLevel().setBlock(pPos, pNewState, pFlags);
         }
@@ -158,12 +197,12 @@ public class Dungeon {
             BlockState ladderState = Blocks.LADDER.defaultBlockState()
                     .setValue(LadderBlock.FACING, ladderFacing)
                     .setValue(LadderBlock.WATERLOGGED, false);
-            setBlock(ladderPos, ladderState, 3);
+            setBlock(ladderPos, ladderState, 3, BlockType.CENTER);
         }
         BlockPos topRoomPos = basePos.above(height);
         generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls, true, false);
         BlockPos opening = ladderBase.above(height);
-        setBlock(opening, Blocks.AIR.defaultBlockState(), 3);
+        setBlock(opening, Blocks.AIR.defaultBlockState(), 3, BlockType.CENTER);
         placeDoorway(world, basePos, width, length, currentDirection, world.random, defaultDoorwayRadius);
     }
 
@@ -213,7 +252,7 @@ public class Dungeon {
                 for (int y = 1; y <= height; y++) {
                     BlockPos blockPos = pos.offset(x, y, z);
                     if (!wallPositions.contains(blockPos)) {
-                        setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
+                        setBlock(blockPos, fillerBlock.defaultBlockState(), 3, BlockType.FILLER);
                     }
                 }
             }
@@ -237,9 +276,9 @@ public class Dungeon {
             for (int z = 0; z < length; z++) {
                 BlockPos floorPos = pos.offset(x, 0, z);
                 if (world.getBlockState(floorPos).getBlock() instanceof LadderBlock) {
-                    setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3);
+                    setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3, BlockType.FLOOR);
                 } else if (!wallPositions.contains(floorPos)) {
-                    setBlock(floorPos, floorBlock.defaultBlockState(), 3);
+                    setBlock(floorPos, floorBlock.defaultBlockState(), 3, BlockType.FLOOR);
                 }
             }
         }
@@ -286,21 +325,21 @@ public class Dungeon {
      * @param forceOverlap  Whether the wall block should forcibly overlap existing blocks, even if they are not suitable for wall placement.
      */
     private void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
-        if (ROOF_BLOCKS.contains(world.getBlockState(pos).getBlock()) ||
+        if (roofBlock.equals(world.getBlockState(pos).getBlock()) ||
                 world.getBlockState(pos).getBlock() instanceof LiquidBlock ||
                 world.getBlockState(pos).isAir()) {
-            setBlock(pos, block.defaultBlockState(), 3);
+            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALL);
             wallPositions.add(pos);
         } else if (forceOverlap) {
-            setBlock(pos, block.defaultBlockState(), 3);
+            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALL);
             wallPositions.add(pos);
         } else if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
-            setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALL);
         } else {
             for (Direction direction : Direction.values()) {
                 BlockPos adjacentPos = pos.relative(direction);
                 if (wallPositions.contains(adjacentPos)) {
-                    setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                    setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALL);
                     return;
                 }
             }
@@ -326,10 +365,10 @@ public class Dungeon {
                 if (!(world.getBlockState(roofPos).getBlock() instanceof LiquidBlock ||
                         world.getBlockState(roofPos).is(Blocks.AIR) ||
                         world.getBlockState(roofPos).is(Blocks.CAVE_AIR) ||
-                        WALL_BLOCKS.contains(world.getBlockState(roofPos).getBlock()))) {
+                        wallBlock.equals(world.getBlockState(roofPos).getBlock()))) {
                     continue;
                 }
-                setBlock(roofPos, roofBlock.defaultBlockState(), 3);
+                setBlock(roofPos, roofBlock.defaultBlockState(), 3, BlockType.ROOF);
             }
         }
     }
@@ -395,14 +434,14 @@ public class Dungeon {
                     for (int j = -doorRadius; j <= doorRadius; j++) {
                         BlockPos doorPos = doorPosBottom1.offset(0, 0, j);
                         BlockPos doorPosTop = doorPos.above();
-                        if (ROOF_BLOCKS.contains(world.getBlockState(outwardPos).getBlock())) {
+                        if (roofBlock.equals(world.getBlockState(outwardPos).getBlock())) {
                             return;
                         }
                         if (!world.getBlockState(doorPos).is(Blocks.LADDER)) {
-                            setBlock(doorPos, Blocks.AIR.defaultBlockState(), 3);
+                            setBlock(doorPos, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
                         }
                         if (!world.getBlockState(doorPosTop).is(Blocks.LADDER)) {
-                            setBlock(doorPosTop, Blocks.AIR.defaultBlockState(), 3);
+                            setBlock(doorPosTop, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
                         }
                     }
                 }
@@ -414,11 +453,11 @@ public class Dungeon {
                 for (int i = -doorRadius; i <= doorRadius; i++) {
                     BlockPos doorPos = doorPosBottom1.offset(0, 0, i);
                     BlockPos doorPosTop = doorPos.above();
-                    if (ROOF_BLOCKS.contains(world.getBlockState(outwardPos).getBlock())) {
+                    if (roofBlock.equals(world.getBlockState(outwardPos).getBlock())) {
                         return;
                     }
-                    setBlock(doorPos, Blocks.AIR.defaultBlockState(), 3);
-                    setBlock(doorPosTop, Blocks.AIR.defaultBlockState(), 3);
+                    setBlock(doorPos, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
+                    setBlock(doorPosTop, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
                 }
             }
             default -> {
@@ -511,9 +550,6 @@ public class Dungeon {
         boolean generatesSpawners = structureContext.isGeneratesSpawners();
         int maxSpawners = structureContext.getMaxSpawners();
         List<EntityType<?>> potentialSpawns = structureContext.getPotentialSpawns();
-        Block wallBlock = selectRandomBlock(WALL_BLOCKS, random);
-        Block floorBlock = selectRandomBlock(FLOOR_BLOCKS, random);
-        Block roofBlock = selectRandomBlock(ROOF_BLOCKS, random);
         Set<BlockPos> previousRoomWalls = null;
         BlockPos currentPos = startPos;
         Direction currentDirection = startDirection;
