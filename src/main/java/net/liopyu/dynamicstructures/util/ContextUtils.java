@@ -32,31 +32,30 @@ public class ContextUtils {
                 String key = entry.getKey().toLowerCase();
                 if (allowedKeywords.contains(key)) {
                     DSHelperClass.logInfoMessage(entry.getKey());
-                    List<Block> list = new ArrayList<>();
                     JsonObject categoryObject = entry.getValue().getAsJsonObject();
                     JsonArray blockArray = categoryObject.getAsJsonArray("Blocks");
                     if (blockArray != null) {
                         for (int i = 0; i < blockArray.size(); i++) {
                             JsonObject blockObject = blockArray.get(i).getAsJsonObject();
                             String name = blockObject.get("block").getAsString();
-
-                            Arrays.stream(BlockType.values()).toList().forEach(blockType -> {
-                                predicates.put(blockType, normalizeJson(blockObject.getAsJsonObject("Predicate")));
-                                if (key.equalsIgnoreCase(blockType.name())) {
-                                    DSHelperClass.logInfoMessage("Adding '" + name + "' to [" + key + "] list.");
-                                    var block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
-                                    list.add(block);
-
-                                    blocks.put(blockType, list);
-                                } else {
-                                    blocks.put(blockType, list);
-                                }
-                            });
+                            Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
+                            if (block != null) {
+                                Arrays.stream(BlockType.values()).forEach(blockType -> {
+                                    if (key.equalsIgnoreCase(blockType.name())) {
+                                        DSHelperClass.logInfoMessage("Adding '" + name + "' to [" + key + "] list.");
+                                        predicates.put(blockType, normalizeJson(blockObject.getAsJsonObject("Predicate")));
+                                        blocks.computeIfAbsent(blockType, k -> new ArrayList<>()).add(block);
+                                    }
+                                });
+                            } else {
+                                DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
+                            }
                         }
                     }
                 }
             }
         }
+
 
         public Map<BlockType, List<Block>> getBlocks() {
             return blocks;

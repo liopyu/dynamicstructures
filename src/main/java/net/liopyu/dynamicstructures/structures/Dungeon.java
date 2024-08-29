@@ -64,51 +64,47 @@ public class Dungeon {
         var random = level.random;
         getStructureContext().getBlockContext().setLevel(level);
         for (Map.Entry<BlockType, List<Block>> entry : getStructureContext().getBlockContext().getBlocks().entrySet()) {
-            boolean found = entry.getValue().isEmpty();
+            boolean found = false;
             switch (entry.getKey()) {
                 case ROOF -> {
-                    if (found) {
-                        roofBlock = selectRandomBlock(entry.getValue(), random);
-                    } else {
-                        roofBlock = selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random);
-                    }
+                    roofBlock = selectRandomBlock(entry.getValue(), random);
                 }
                 case WALL -> {
-                    if (found) {
-                        wallBlock = selectRandomBlock(entry.getValue(), random);
-                    } else {
-                        wallBlock = selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random);
-                    }
+                    wallBlock = selectRandomBlock(entry.getValue(), random);
                 }
                 case FLOOR -> {
-                    if (found) {
-                        floorBlock = selectRandomBlock(entry.getValue(), random);
-                    } else {
-                        floorBlock = selectRandomBlock(Arrays.stream(FLOOR_BLOCKS).toList(), random);
-                    }
+                    floorBlock = selectRandomBlock(entry.getValue(), random);
                 }
                 case FILLER -> {
-                    if (found) {
-                        fillerBlock = selectRandomBlock(entry.getValue(), random);
-                    } else {
-                        fillerBlock = selectRandomBlock(Arrays.stream(FILLER_BLOCKS).toList(), random);
-                    }
+                    fillerBlock = selectRandomBlock(entry.getValue(), random);
                 }
                 case DOORWAY -> {
-                    if (found) {
-                        doorwayBlock = selectRandomBlock(entry.getValue(), random);
-                    } else {
-                        doorwayBlock = selectRandomBlock(Arrays.stream(DOORWAY_BLOCKS).toList(), random);
-                    }
+                    doorwayBlock = selectRandomBlock(entry.getValue(), random);
+
                 }
                 case CENTER -> {
-                    if (found) {
-                        centerBlock = selectRandomBlock(entry.getValue(), random);
-                    } else {
-                        centerBlock = selectRandomBlock(Arrays.stream(CENTER_BLOCKS).toList(), random);
-                    }
+                    centerBlock = selectRandomBlock(entry.getValue(), random);
+
                 }
             }
+        }
+        if (roofBlock == null) {
+            roofBlock = selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random);
+        }
+        if (centerBlock == null) {
+            centerBlock = selectRandomBlock(Arrays.stream(CENTER_BLOCKS).toList(), random);
+        }
+        if (doorwayBlock == null) {
+            doorwayBlock = selectRandomBlock(Arrays.stream(DOORWAY_BLOCKS).toList(), random);
+        }
+        if (fillerBlock == null) {
+            fillerBlock = selectRandomBlock(Arrays.stream(FILLER_BLOCKS).toList(), random);
+        }
+        if (floorBlock == null) {
+            floorBlock = selectRandomBlock(Arrays.stream(FLOOR_BLOCKS).toList(), random);
+        }
+        if (wallBlock == null) {
+            wallBlock = selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random);
         }
     }
 
