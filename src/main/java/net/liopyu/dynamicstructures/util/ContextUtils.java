@@ -44,7 +44,9 @@ public class ContextUtils {
                                 Arrays.stream(BlockType.values()).forEach(blockType -> {
                                     if (key.equalsIgnoreCase(blockType.name())) {
                                         DSHelperClass.logInfoMessage("Adding '" + name + "' to [" + key + "] list.");
-                                        predicates.put(blockType, normalizeJson(blockObject.getAsJsonObject("Predicate")));
+                                        if (blockObject.getAsJsonObject("predicate") != null) {
+                                            predicates.put(blockType, normalizeJson(blockObject.getAsJsonObject("predicate")));
+                                        }
                                         blocks.computeIfAbsent(blockType, k -> new ArrayList<>()).add(block);
                                     }
                                 });
