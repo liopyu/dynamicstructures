@@ -49,6 +49,9 @@ public class Dungeon {
     public Block fillerBlock;
     public BlockPos currentPosition;
     public Map<BlockType, Block> blocks;
+    public int maxSpawners;
+    public int maxSpawnersPerRoom;
+    public int currentSpawners;
 
     /**
      * Constructs a new {@code Dungeon} instance with the given {@link ContextUtils.StructureContext} and {@link ServerLevel}.
@@ -143,9 +146,12 @@ public class Dungeon {
      * @param maxSpawners     The maximum number of spawners that can be placed per room.
      * @param potentialSpawns A list of {@link EntityType} representing the types of entities that can be spawned by the spawners.
      */
-    private void placeSpawners(ServerLevel world, BlockPos pos, int width, int length, int height, RandomSource random, int maxSpawners, List<EntityType<?>> potentialSpawns) {
-        int spawnersToPlace = random.nextInt(maxSpawners + 1); // Randomly decide how many spawners to place, up to maxSpawners
-        for (int i = 0; i < spawnersToPlace; i++) {
+    private void placeSpawners(ServerLevel world, BlockPos pos, int width, int length, int height, RandomSource random, int maxSpawnersPerRoom, int maxSpawners, List<EntityType<?>> potentialSpawns) {
+        if (currentSpawners >= maxSpawners) {
+            return;
+        }
+
+        for (int i = 0; i < maxSpawnersPerRoom; i++) {
             int x = pos.getX() + random.nextInt(width);
             int y = pos.getY() + random.nextInt(height);
             int z = pos.getZ() + random.nextInt(length);
@@ -155,6 +161,7 @@ public class Dungeon {
             BlockEntity blockEntity = world.getBlockEntity(spawnerPos);
             if (blockEntity instanceof SpawnerBlockEntity spawnerEntity) {
                 spawnerEntity.getSpawner().setEntityId(entityType, world, world.random, spawnerPos);
+                currentSpawners++;
             }
         }
     }
@@ -544,7 +551,8 @@ public class Dungeon {
         int baseLength = structureContext.getLength();
         int sizeThreshold = structureContext.getSizeThreshold();
         boolean generatesSpawners = structureContext.isGeneratesSpawners();
-        int maxSpawners = structureContext.getMaxSpawners();
+        maxSpawners = structureContext.getMaxSpawners();
+        maxSpawnersPerRoom = structureContext.getMaxSpawnersPerRoom();
         List<EntityType<?>> potentialSpawns = structureContext.getPotentialSpawns();
         Set<BlockPos> previousRoomWalls = null;
         BlockPos currentPos = startPos;
@@ -559,8 +567,8 @@ public class Dungeon {
                 BlockPos upperRoomPos = currentPos.above(height);
                 placeDoorway(level, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 if (generatesSpawners) {
-                    placeSpawners(level, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
-                    placeSpawners(level, upperRoomPos, width, length, height, random, maxSpawners, potentialSpawns);
+                    placeSpawners(level, currentPos, width, length, height, random, maxSpawnersPerRoom, maxSpawners, potentialSpawns);
+                    placeSpawners(level, upperRoomPos, width, length, height, random, maxSpawnersPerRoom, maxSpawners, potentialSpawns);
                 }
                 currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
             } else {
@@ -568,7 +576,7 @@ public class Dungeon {
                 previousRoomWalls = currentRoomWalls;
                 placeDoorway(level, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 if (generatesSpawners) {
-                    placeSpawners(level, currentPos, width, length, height, random, maxSpawners, potentialSpawns);
+                    placeSpawners(level, currentPos, width, length, height, random, maxSpawnersPerRoom, maxSpawners, potentialSpawns);
                 }
                 currentPos = calculateNextRoomPos(currentPos, width, length, currentDirection);
             }
