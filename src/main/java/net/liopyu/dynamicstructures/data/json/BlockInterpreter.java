@@ -1,16 +1,14 @@
-package net.liopyu.dynamicstructures.util;
+package net.liopyu.dynamicstructures.data.json;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import net.liopyu.dynamicstructures.util.ContextUtils;
+import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.*;
 
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;

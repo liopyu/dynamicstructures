@@ -11,12 +11,16 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
+import net.minecraft.world.level.levelgen.feature.configurations.FeatureConfiguration;
+import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.ChunkEvent;
@@ -25,6 +29,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegisterEvent;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -357,7 +362,6 @@ public class ServerForgeEvents {
             var serverLevel = (ServerLevel) event.getLevel();
             var structureContext = DSHelperClass.getStructureContext("test");
             var spawnContext = DSHelperClass.getSpawnContext("test");
-
             /*StructureLoader.loadStructures().keySet().forEach(DSHelperClass::logInfoMessage);
             StructureLoader.loadStructures().values().forEach(context -> DSHelperClass.logInfoMessage(context.getStructureName()));
             var list = findPotentialStructurePositions(structureContext,
@@ -371,6 +375,7 @@ public class ServerForgeEvents {
             list.forEach(position -> DSHelperClass.logInfoMessage(position.toString()));*/
         }
     }
+
 
     @SubscribeEvent
     public static void onCommandRegistry(RegisterCommandsEvent event) {

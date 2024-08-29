@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
+import net.liopyu.dynamicstructures.data.json.BlockType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +16,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
 
-import static net.liopyu.dynamicstructures.util.BlockInterpreter.allowedKeywords;
+import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedKeywords;
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class ContextUtils {
@@ -31,10 +32,10 @@ public class ContextUtils {
             for (Map.Entry<String, JsonElement> entry : normalizedJson.entrySet()) {
                 String key = entry.getKey().toLowerCase();
                 if (allowedKeywords.contains(key)) {
-                    DSHelperClass.logInfoMessage(entry.getKey());
                     JsonObject categoryObject = entry.getValue().getAsJsonObject();
-                    JsonArray blockArray = categoryObject.getAsJsonArray("Blocks");
+                    JsonArray blockArray = categoryObject.getAsJsonArray("blocks");
                     if (blockArray != null) {
+
                         for (int i = 0; i < blockArray.size(); i++) {
                             JsonObject blockObject = blockArray.get(i).getAsJsonObject();
                             String name = blockObject.get("block").getAsString();

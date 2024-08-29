@@ -1,7 +1,7 @@
 package net.liopyu.dynamicstructures.structures;
 
-import net.liopyu.dynamicstructures.util.BlockInterpreter;
-import net.liopyu.dynamicstructures.util.BlockType;
+import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
+import net.liopyu.dynamicstructures.data.json.BlockType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
@@ -72,7 +72,7 @@ public class Dungeon {
                 case ROOF -> {
                     roofBlock = selectRandomBlock(entry.getValue(), random);
                 }
-                case WALL -> {
+                case WALLS -> {
                     wallBlock = selectRandomBlock(entry.getValue(), random);
                 }
                 case FLOOR -> {
@@ -331,18 +331,18 @@ public class Dungeon {
         if (roofBlock.equals(world.getBlockState(pos).getBlock()) ||
                 world.getBlockState(pos).getBlock() instanceof LiquidBlock ||
                 world.getBlockState(pos).isAir()) {
-            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALL);
+            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
             wallPositions.add(pos);
         } else if (forceOverlap) {
-            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALL);
+            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
             wallPositions.add(pos);
         } else if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
-            setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALL);
+            setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
         } else {
             for (Direction direction : Direction.values()) {
                 BlockPos adjacentPos = pos.relative(direction);
                 if (wallPositions.contains(adjacentPos)) {
-                    setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALL);
+                    setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
                     return;
                 }
             }
@@ -583,6 +583,4 @@ public class Dungeon {
             currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
         }
     }
-
-
 }

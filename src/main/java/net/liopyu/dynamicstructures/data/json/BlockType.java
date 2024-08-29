@@ -1,7 +1,7 @@
-package net.liopyu.dynamicstructures.util;
+package net.liopyu.dynamicstructures.data.json;
 
 public enum BlockType {
-    WALL,
+    WALLS,
     FLOOR,
     ROOF,
     CENTER,
