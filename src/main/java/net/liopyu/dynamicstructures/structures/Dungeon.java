@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
 
@@ -65,7 +66,8 @@ public class Dungeon {
         this.structureContext = structureContext;
         this.level = level;
         var random = level.random;
-        getStructureContext().getBlockContext().setLevel(level);
+        var blockContext = getStructureContext().getBlockContext();
+        blockContext.setLevel(level);
         for (Map.Entry<BlockType, List<Block>> entry : getStructureContext().getBlockContext().getBlocks().entrySet()) {
             boolean found = false;
             switch (entry.getKey()) {
@@ -83,11 +85,9 @@ public class Dungeon {
                 }
                 case DOORWAY -> {
                     doorwayBlock = selectRandomBlock(entry.getValue(), random);
-
                 }
                 case CENTER -> {
                     centerBlock = selectRandomBlock(entry.getValue(), random);
-
                 }
             }
         }
@@ -109,6 +109,12 @@ public class Dungeon {
         if (wallBlock == null) {
             wallBlock = selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random);
         }
+        blockContext.setRoofBlock(roofBlock);
+        blockContext.setWallBlock(wallBlock);
+        blockContext.setCenterBlock(centerBlock);
+        blockContext.setDoorwayBlock(doorwayBlock);
+        blockContext.setFillerBlock(fillerBlock);
+        blockContext.setFloorBlock(floorBlock);
     }
 
     /**
@@ -168,7 +174,9 @@ public class Dungeon {
 
     public void setBlock(BlockPos pPos, BlockState pNewState, int pFlags, BlockType blockType) {
         getStructureContext().getBlockContext().setPos(pPos);
-        boolean placeBlock = BlockInterpreter.evaluateConditions(blockType, getStructureContext().getBlockContext());
+        var blockKey = getLevel().registryAccess().registryOrThrow(ForgeRegistries.BLOCKS.getRegistryKey());
+        var blockName = blockKey.getKey(pNewState.getBlock()).toString();
+        boolean placeBlock = BlockInterpreter.evaluateConditions(blockName, blockType, getStructureContext().getBlockContext());
         if (placeBlock) {
             this.getLevel().setBlock(pPos, pNewState, pFlags);
         }

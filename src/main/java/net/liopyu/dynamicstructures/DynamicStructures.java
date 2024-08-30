@@ -33,7 +33,7 @@ public class DynamicStructures {
     @SubscribeEvent
     public void commonSetup(final FMLCommonSetupEvent event) {
         Arrays.stream(BlockType.values()).toList().forEach(blockType -> {
-            BlockInterpreter.allowedKeywords.add(blockType.name().toLowerCase());
+            BlockInterpreter.allowedBlockTypes.add(blockType.name().toLowerCase());
         });
         StructureSetLoader.loadStructures();
         StructureLoader.loadStructures();

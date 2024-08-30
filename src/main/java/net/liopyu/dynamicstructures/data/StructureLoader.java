@@ -146,24 +146,103 @@ public class StructureLoader {
      * if no other structures are found.
      */
     private static void createDefaultStructureFile() {
+        if (DEFAULT_STRUCTURE_FILE.exists()) {
+            DEFAULT_STRUCTURE_FILE.delete();
+        }
         try (FileWriter writer = new FileWriter(DEFAULT_STRUCTURE_FILE)) {
             writer.write("{\n");
-            writer.write("    \"Structure Name\": \"example_structure\",\n");
-            writer.write("    \"Ladder Chance\": 10,\n");
-            writer.write("    \"Room Count\": 10,\n");
-            writer.write("    \"Height\": 6,\n");
-            writer.write("    \"Width\": 10,\n");
-            writer.write("    \"Length\": 10,\n");
-            writer.write("    \"Size Threshold\": 20,\n");
-            writer.write("    \"Generate Spawners\": true,\n");
-            writer.write("    \"Max Spawners\": 2,\n");
-            writer.write("    \"Spawner Entities\": [\n");
-            writer.write("        \"minecraft:zombie\",\n");
-            writer.write("        \"minecraft:skeleton\"\n");
+            writer.write("  \"name\": \"test\",\n");
+            writer.write("  \"ladder_chance\": 10,\n");
+            writer.write("  \"rooms\": 15,\n");
+            writer.write("  \"height\": 8,\n");
+            writer.write("  \"width\": 8,\n");
+            writer.write("  \"length\": 8,\n");
+            writer.write("  \"size_threshold\": 1,\n");
+            writer.write("  \"spawners\": {\n");
+            writer.write("    \"max\": 10,\n");
+            writer.write("    \"room_count\": 1,\n");
+            writer.write("    \"mobs\": [\n");
+            writer.write("      \"minecraft:zombie\",\n");
+            writer.write("      \"minecraft:creeper\"\n");
             writer.write("    ]\n");
+            writer.write("  },\n");
+            writer.write("  \"walls\": {\n");
+            writer.write("    \"blocks\": [\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:oak_planks\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:stone_bricks\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:bricks\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:cobblestone\",\n");
+            writer.write("        \"weight\": 10,\n");
+            writer.write("        \"predicate\": {\n");
+            writer.write("          \"biomes\": [\n");
+            writer.write("            \"minecraft:plains\",\n");
+            writer.write("            \"minecraft:forest\"\n");
+            writer.write("          ]\n");
+            writer.write("        }\n");
+            writer.write("      }\n");
+            writer.write("    ]\n");
+            writer.write("  },\n");
+            writer.write("  \"floor\": {\n");
+            writer.write("    \"blocks\": [\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:stone\",\n");
+            writer.write("        \"weight\": 10,\n");
+            writer.write("        \"predicate\": {\n");
+            writer.write("          \"height\": {\n");
+            writer.write("            \"min\": 0,\n");
+            writer.write("            \"max\": 256\n");
+            writer.write("          }\n");
+            writer.write("        }\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:smooth_stone\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:oak_planks\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:cobblestone\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      }\n");
+            writer.write("    ]\n");
+            writer.write("  },\n");
+            writer.write("  \"roof\": {\n");
+            writer.write("    \"blocks\": [\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:oak_slab\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:brick_slab\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:stone_slab\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      },\n");
+            writer.write("      {\n");
+            writer.write("        \"block\": \"minecraft:cobblestone_slab\",\n");
+            writer.write("        \"weight\": 10\n");
+            writer.write("      }\n");
+            writer.write("    ]\n");
+            writer.write("  }\n");
             writer.write("}\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+
 }

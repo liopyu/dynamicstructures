@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.data.json.BlockType;
+import net.liopyu.dynamicstructures.data.json.KeyWordType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -17,25 +18,32 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.util.*;
 
 import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedKeywords;
+import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedBlockTypes;
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class ContextUtils {
     public static class BlockContext {
         private final JsonObject json;
+        public Block floorBlock;
+        public Block wallBlock;
+        public Block roofBlock;
+        public Block centerBlock;
+        public Block doorwayBlock;
+        public Block fillerBlock;
         private ServerLevel level;
         private BlockPos pos;
         private Map<BlockType, List<Block>> blocks = new HashMap<>();
-        private Map<BlockType, JsonObject> predicates = new HashMap<>();
+        private Map<String, JsonObject> predicates = new HashMap<>();
+        private Map<String, JsonObject> functions = new HashMap<>();
 
         public BlockContext(JsonObject normalizedJson) {
             this.json = normalizedJson;
             for (Map.Entry<String, JsonElement> entry : normalizedJson.entrySet()) {
                 String key = entry.getKey().toLowerCase();
-                if (allowedKeywords.contains(key)) {
+                if (allowedBlockTypes.contains(key)) {
                     JsonObject categoryObject = entry.getValue().getAsJsonObject();
                     JsonArray blockArray = categoryObject.getAsJsonArray("blocks");
                     if (blockArray != null) {
-
                         for (int i = 0; i < blockArray.size(); i++) {
                             JsonObject blockObject = blockArray.get(i).getAsJsonObject();
                             String name = blockObject.get("block").getAsString();
@@ -43,10 +51,24 @@ public class ContextUtils {
                             if (block != null) {
                                 Arrays.stream(BlockType.values()).forEach(blockType -> {
                                     if (key.equalsIgnoreCase(blockType.name())) {
-                                        DSHelperClass.logInfoMessage("Adding '" + name + "' to [" + key + "] list.");
-                                        if (blockObject.getAsJsonObject("predicate") != null) {
-                                            predicates.put(blockType, normalizeJson(blockObject.getAsJsonObject("predicate")));
-                                        }
+                                        DSHelperClass.logInfoMessageDev("Adding '" + name + "' to [" + key + "] list.");
+                                        Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
+                                            var keywordString = keyword.name().toLowerCase();
+                                            var combinedString = blockType.name().toLowerCase() + "," + keywordString + "," + name;
+                                            if (blockObject.getAsJsonObject(keywordString) != null) {
+                                                // TODO: remove these from the maps once they're chosen in the future
+                                                switch (keywordString) {
+                                                    case "predicate":
+                                                        DSHelperClass.logInfoMessageDev("Adding '" + keyword.name() + "' to [" + name + "] as predicate: " + combinedString);
+                                                        predicates.put(combinedString, normalizeJson(blockObject.getAsJsonObject(keyword.name().toLowerCase())));
+                                                        break;
+                                                    case "function":
+                                                        DSHelperClass.logInfoMessageDev("Adding '" + keyword.name() + "' to [" + name + "] as function: " + combinedString);
+                                                        functions.put(combinedString, normalizeJson(blockObject.getAsJsonObject(keyword.name().toLowerCase())));
+                                                        break;
+                                                }
+                                            }
+                                        });
                                         blocks.computeIfAbsent(blockType, k -> new ArrayList<>()).add(block);
                                     }
                                 });
@@ -59,6 +81,57 @@ public class ContextUtils {
             }
         }
 
+        public Block getWallBlock() {
+            return wallBlock;
+        }
+
+        public void setWallBlock(Block wallBlock) {
+            this.wallBlock = wallBlock;
+        }
+
+        public Block getRoofBlock() {
+            return roofBlock;
+        }
+
+        public void setRoofBlock(Block roofBlock) {
+            this.roofBlock = roofBlock;
+        }
+
+        public Block getFloorBlock() {
+            return floorBlock;
+        }
+
+        public void setFloorBlock(Block floorBlock) {
+            this.floorBlock = floorBlock;
+        }
+
+        public Block getFillerBlock() {
+            return fillerBlock;
+        }
+
+        public void setFillerBlock(Block fillerBlock) {
+            this.fillerBlock = fillerBlock;
+        }
+
+        public Block getDoorwayBlock() {
+            return doorwayBlock;
+        }
+
+        public void setDoorwayBlock(Block doorwayBlock) {
+            this.doorwayBlock = doorwayBlock;
+        }
+
+        public Block getCenterBlock() {
+            return centerBlock;
+        }
+
+        public void setCenterBlock(Block centerBlock) {
+            this.centerBlock = centerBlock;
+        }
+
+        public Map<String, JsonObject> getFunctions() {
+            return functions;
+        }
 
         public Map<BlockType, List<Block>> getBlocks() {
             return blocks;
@@ -68,11 +141,11 @@ public class ContextUtils {
             this.blocks = blocks;
         }
 
-        public Map<BlockType, JsonObject> getPredicates() {
+        public Map<String, JsonObject> getPredicates() {
             return predicates;
         }
 
-        public void setPredicates(Map<BlockType, JsonObject> predicates) {
+        public void setPredicates(Map<String, JsonObject> predicates) {
             this.predicates = predicates;
         }
 
@@ -128,6 +201,7 @@ public class ContextUtils {
         private final int maxSpawners;
         private final int sizeThreshold;
         private final List<EntityType<?>> potentialSpawns;
+
         private BlockPos startPos;
         private BlockContext blockContext;
 
@@ -203,6 +277,7 @@ public class ContextUtils {
             structure.setBlockContext(blockContext);
             return structure;
         }
+
 
         public int getMaxSpawnersPerRoom() {
             return maxSpawnersPerRoom;

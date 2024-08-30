@@ -138,16 +138,18 @@ public class StructureSetLoader {
     private static void createDefaultStructureFile() {
         Random random = new Random();
         int randomSalt = 1_000_000_000 + random.nextInt(1_000_000_000);
-
+        if (DEFAULT_STRUCTURE_FILE.exists()) {
+            DEFAULT_STRUCTURE_FILE.delete();
+        }
         try (FileWriter writer = new FileWriter(DEFAULT_STRUCTURE_FILE)) {
             writer.write("{\n");
-            writer.write("    \"Structure Name\": \"test\",\n");
-            writer.write("    \"Salt\": " + randomSalt + ",\n");
-            writer.write("    \"Separation\": 7,\n");
-            writer.write("    \"Spacing\": 8,\n");
-            writer.write("    \"y Min\": -32,\n");
-            writer.write("    \"y Max\": 0,\n");
-            writer.write("    \"Max Distance\": 35\n");
+            writer.write("    \"name\": \"example_structure\",\n");
+            writer.write("    \"salt\": " + randomSalt + ",\n");
+            writer.write("    \"separation\": 17,\n");
+            writer.write("    \"spacing\": 20\n");
+            writer.write("    \"y_min\": -32,\n");
+            writer.write("    \"y_max\": 0,\n");
+            writer.write("    \"max_distance\": 35\n");
             writer.write("}\n");
         } catch (IOException e) {
             e.printStackTrace();

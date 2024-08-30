@@ -7,6 +7,7 @@ import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
@@ -14,10 +15,11 @@ import java.util.*;
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class BlockInterpreter {
+    public static List<String> allowedBlockTypes = new ArrayList<>();
     public static List<String> allowedKeywords = new ArrayList<>();
 
 
-    public static boolean evaluateConditions(BlockType blockType, ContextUtils.BlockContext context) {
+    public static boolean evaluateConditions(String blockName, BlockType blockType, ContextUtils.BlockContext context) {
         var currentBiome = (context.getLevel().getBiome(context.getPos())).get();
         var biomeKey = context.getLevel().registryAccess().registryOrThrow(ForgeRegistries.BIOMES.getRegistryKey());
         var biomeName = biomeKey.getKey(currentBiome).toString();
@@ -27,9 +29,14 @@ public class BlockInterpreter {
         boolean biomeConditionMet = true;
         boolean heightConditionMet = true;
         boolean existingBlockConditionMet = true;
-        if (!context.getPredicates().containsKey(blockType)) return true;
-        for (Map.Entry<BlockType, JsonObject> predicateObject : context.getPredicates().entrySet()) {
-            if (predicateObject.getKey() == blockType) {
+        String parsedBlock = blockType.name().toLowerCase() + blockName;
+        if (!context.getPredicates().containsKey(parsedBlock)) return true;
+        for (Map.Entry<String, JsonObject> predicateObject : context.getPredicates().entrySet()) {
+            String splitString = predicateObject.getKey().split(",")[0];
+            DSHelperClass.logInfoMessageDev("Split string: " + splitString);
+            if (BlockType.valueOf(splitString) + blockName == parsedBlock) {
+                DSHelperClass.logInfoMessageDev("parsedBlock: " + parsedBlock);
+                DSHelperClass.logInfoMessageDev("First Block Type string: " + BlockType.valueOf(splitString) + blockName);
                 if (predicateObject.getValue().has("biomes")) {
                     JsonArray biomesArray = predicateObject.getValue().getAsJsonArray("biomes");
                     biomeConditionMet = false;

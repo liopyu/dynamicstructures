@@ -2,6 +2,8 @@ package net.liopyu.dynamicstructures.events.server;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.liopyu.dynamicstructures.commands.FindStructureCommand;
+import net.liopyu.dynamicstructures.commands.NewStructureCommand;
+import net.liopyu.dynamicstructures.commands.PlaceStructureCommand;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.structures.Dungeon;
@@ -41,17 +43,17 @@ public class ServerForgeEvents {
     /**
      * Handles chunk initialization when a chunk is loaded, specifically for newly generated chunks.
      * Subscribed to {@link ChunkEvent.Load}, this method dynamically triggers custom structure generation
-     * by leveraging {@link ServerForgeEvents#performIfLoaded(ServerLevel, BlockPos, Runnable)}. This allows for the addition or
+     * by leveraging {@link ServerForgeEvents#performIfLoaded(ServerLevel, BlockPos, Runnable, net.liopyu.dynamicstructures.util.ContextUtils.SpawnContext)}. This allows for the addition or
      * modification of structures based on runtime conditions, mimicking Minecraft's structure set logic.
      * <p>
      * The method checks if the chunk is new, retrieves the relevant {@link ServerLevel}, and then initiates
-     * structure generation if applicable. Utility methods like {@link #performFirstTimeLoadActionBoolean(BlockPos, ServerLevel)}
+     * structure generation if applicable. Utility methods like {@link #performFirstTimeLoadActionBoolean(net.liopyu.dynamicstructures.util.ContextUtils.SpawnContext, BlockPos, ServerLevel)}
      * and {@link #shouldGenerateStructure(ContextUtils.StructureContext, ContextUtils.SpawnContext, ChunkPos, ServerLevel, BlockPos)}
      * assist in determining whether and how structures should be generated within the chunk.
      *
      * @param event The {@link ChunkEvent.Load} event providing context about the loaded chunk.
      * @see ChunkEvent.Load
-     * @see #performIfLoaded(ServerLevel, BlockPos, Runnable)
+     * @see #performIfLoaded(ServerLevel, BlockPos, Runnable, net.liopyu.dynamicstructures.util.ContextUtils.SpawnContext)
      * @see net.minecraft.world.level.levelgen.structure.StructureSet
      */
     @SubscribeEvent
@@ -65,9 +67,11 @@ public class ServerForgeEvents {
                 ServerLevel serverLevel = server.getLevel(dimensionKey);
                 BlockPos pos = event.getChunk().getPos().getWorldPosition();
                 if (serverLevel != null) {
-                    performIfLoaded(serverLevel, pos, () -> {
-                        performFirstTimeLoadAction(serverLevel.getChunk(pos), serverLevel);
-                    });
+                    for (ContextUtils.SpawnContext context : StructureSetLoader.cachedStructures.values()) {
+                        performIfLoaded(serverLevel, pos, () -> {
+                            performFirstTimeLoadAction(context, serverLevel.getChunk(pos), serverLevel);
+                        }, context);
+                    }
                 } else {
                     DSHelperClass.logWarningMessageOnce("Warning: Unable to retrieve ServerLevel for dimension: " + dimensionKey.location());
                 }
@@ -92,10 +96,10 @@ public class ServerForgeEvents {
      * @param serverLevel The server level where the operation is to be performed.
      * @param pos         The world position to check.
      * @param runnable    The action to execute if the position is loaded.
-     * @see #performFirstTimeLoadActionBoolean(BlockPos, ServerLevel)
+     * @see #performFirstTimeLoadActionBoolean(net.liopyu.dynamicstructures.util.ContextUtils.SpawnContext, BlockPos, ServerLevel)
      */
-    public static void performIfLoaded(ServerLevel serverLevel, BlockPos pos, Runnable runnable) {
-        CompletableFuture.supplyAsync(() -> performFirstTimeLoadActionBoolean(pos, serverLevel))
+    public static void performIfLoaded(ServerLevel serverLevel, BlockPos pos, Runnable runnable, ContextUtils.SpawnContext spawnContext) {
+        CompletableFuture.supplyAsync(() -> performFirstTimeLoadActionBoolean(spawnContext, pos, serverLevel))
                 .thenAcceptAsync(isLoaded -> {
                     if (isLoaded) {
                         serverLevel.getServer().execute(runnable);
@@ -121,11 +125,10 @@ public class ServerForgeEvents {
      * @see ContextUtils.SpawnContext
      * @see ContextUtils.StructureContext
      */
-    public static boolean performFirstTimeLoadActionBoolean(BlockPos pos, ServerLevel serverLevel) {
+    public static boolean performFirstTimeLoadActionBoolean(ContextUtils.SpawnContext spawnContext, BlockPos pos, ServerLevel serverLevel) {
         Random random = new Random();
         Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
         for (ContextUtils.StructureContext structureContext : structures.values()) {
-            ContextUtils.SpawnContext spawnContext = DSHelperClass.getSpawnContext(structureContext.getStructureName());
             if (spawnContext != null) {
                 int yMin = spawnContext.getyMin();
                 int yMax = spawnContext.getyMax();
@@ -136,7 +139,7 @@ public class ServerForgeEvents {
                     return true;
                 }
             } else {
-                DSHelperClass.logWarningMessageOnce("Spawning Context is null: " + serverLevel.getChunk(pos).getPos() + " for spawningContext: " + spawnContext.getName() + " with structureContext: " + structureContext.getStructureName());
+                DSHelperClass.logWarningMessageOnceDev("Spawning Context is null: " + serverLevel.getChunk(pos).getPos() + " for spawningContext: " + spawnContext.getName() + " with structureContext: " + structureContext.getStructureName());
                 return false;
             }
         }
@@ -160,14 +163,11 @@ public class ServerForgeEvents {
      * @see ContextUtils.SpawnContext
      * @see ContextUtils.StructureContext
      */
-    private static void performFirstTimeLoadAction(ChunkAccess chunk, ServerLevel level) {
+    private static void performFirstTimeLoadAction(ContextUtils.SpawnContext spawnContext, ChunkAccess chunk, ServerLevel level) {
         Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
         for (ContextUtils.StructureContext structureContext : structures.values()) {
-            ContextUtils.SpawnContext spawnContext = DSHelperClass.getSpawnContext(structureContext.getStructureName());
             if (spawnContext != null) {
-                if (!FMLEnvironment.production) {
-                    DSHelperClass.logInfoMessageOnce("Spawning structure: " + chunk.getPos());
-                }
+                DSHelperClass.logInfoMessageOnceDev("Spawning structure: " + chunk.getPos());
                 new Dungeon(structureContext, level).generateDungeon();
             } else {
                 DSHelperClass.logWarningMessageOnce(" Spawning Context is null: " + chunk.getPos() + " for structureContext: " + structureContext.getStructureName() + " for spawnContext: " + structureContext.getStructureName());
@@ -260,6 +260,14 @@ public class ServerForgeEvents {
             return false;
         }
         return false;
+    }
+
+    public static boolean shouldGenerateStructure(ContextUtils.StructureContext structureContext, ServerLevel level, BlockPos pos) {
+        int width = getMaxSize(structureContext.getWidth(), structureContext.getSizeThreshold()) + 5;
+        int length = getMaxSize(structureContext.getLength(), structureContext.getSizeThreshold()) + 5;
+        int height = structureContext.getHeight() + 5;
+        BlockPos furthestPos = pos.offset(width / 2, height, length / 2);
+        return level.isLoaded(furthestPos);
     }
 
     /**
@@ -380,6 +388,12 @@ public class ServerForgeEvents {
     @SubscribeEvent
     public static void onCommandRegistry(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        // Production commands
         FindStructureCommand.register(dispatcher);
+        PlaceStructureCommand.register(dispatcher);
+
+        // My dev commands
+        if (!FMLEnvironment.production)
+            NewStructureCommand.register(dispatcher);
     }
 }

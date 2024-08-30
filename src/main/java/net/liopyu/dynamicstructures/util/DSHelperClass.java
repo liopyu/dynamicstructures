@@ -49,6 +49,13 @@ public class DSHelperClass {
         }
     }
 
+    public static void logWarningMessageOnceDev(String errorMessage) {
+        if (!FMLEnvironment.production && !warningMessagesLogged.contains(errorMessage)) {
+            LOGGER.warn("[Dynamic Structures]: " + errorMessage);
+            warningMessagesLogged.add(errorMessage);
+        }
+    }
+
     public static void logWarningMessage(String errorMessage) {
         LOGGER.warn("[Dynamic Structures]: " + errorMessage);
     }
@@ -71,8 +78,21 @@ public class DSHelperClass {
         }
     }
 
+    public static void logInfoMessageOnceDev(String info) {
+        if (!FMLEnvironment.production && !infoMessagesLogged.contains(info)) {
+            LOGGER.info("[Dynamic Structures]: " + info);
+            infoMessagesLogged.add(info);
+        }
+    }
+
     public static void logInfoMessage(String info) {
         LOGGER.info("[Dynamic Structures]: " + info);
+    }
+
+    public static void logInfoMessageDev(String info) {
+        if (!FMLEnvironment.production) {
+            LOGGER.info("[Dynamic Structures]: " + info);
+        }
     }
 
     public static <T> boolean consumerCallback(Consumer<T> consumer, T value, String errorMessage) {

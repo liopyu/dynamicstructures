@@ -82,7 +82,11 @@ public class FindStructureCommand {
         ContextUtils.StructureContext structureContext = DSHelperClass.getStructureContext(structureName);
         ContextUtils.SpawnContext spawnContext = DSHelperClass.getSpawnContext(structureName);
         try {
-            if (structureContext != null && spawnContext != null) {
+            if (spawnContext == null) {
+                source.sendFailure(Component.literal("No structure_set with the name '" + structureName + "'.").withStyle(ChatFormatting.RED));
+                return 0;
+            }
+            if (structureContext != null) {
                 Optional<BlockPos> nearestStructure = findNearestStructure(structureName, structureContext, spawnContext, level, playerPos);
                 if (nearestStructure.isPresent()) {
                     BlockPos structurePos = nearestStructure.get();
