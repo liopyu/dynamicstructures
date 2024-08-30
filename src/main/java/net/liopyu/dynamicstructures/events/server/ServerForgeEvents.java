@@ -1,6 +1,7 @@
 package net.liopyu.dynamicstructures.events.server;
 
 import com.mojang.brigadier.CommandDispatcher;
+import net.liopyu.dynamicstructures.commands.DefaultStructureCommand;
 import net.liopyu.dynamicstructures.commands.FindStructureCommand;
 import net.liopyu.dynamicstructures.commands.NewStructureCommand;
 import net.liopyu.dynamicstructures.commands.PlaceStructureCommand;
@@ -68,9 +69,11 @@ public class ServerForgeEvents {
                 BlockPos pos = event.getChunk().getPos().getWorldPosition();
                 if (serverLevel != null) {
                     for (ContextUtils.SpawnContext context : StructureSetLoader.cachedStructures.values()) {
-                        performIfLoaded(serverLevel, pos, () -> {
-                            performFirstTimeLoadAction(context, serverLevel.getChunk(pos), serverLevel);
-                        }, context);
+                        if (DSHelperClass.getStructureContext(context.getName()) != null) {
+                            performIfLoaded(serverLevel, pos, () -> {
+                                performFirstTimeLoadAction(context, serverLevel.getChunk(pos), serverLevel);
+                            }, context);
+                        }
                     }
                 } else {
                     DSHelperClass.logWarningMessageOnce("Warning: Unable to retrieve ServerLevel for dimension: " + dimensionKey.location());
@@ -391,6 +394,7 @@ public class ServerForgeEvents {
         // Production commands
         FindStructureCommand.register(dispatcher);
         PlaceStructureCommand.register(dispatcher);
+        DefaultStructureCommand.register(dispatcher);
 
         // My dev commands
         if (!FMLEnvironment.production)

@@ -38,7 +38,7 @@ import java.util.*;
  */
 public class StructureSetLoader {
     public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structure_set/");
-    private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_structure.json");
+    private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_dungeon.json");
     public static Map<String, ContextUtils.SpawnContext> cachedStructures = new HashMap<>();
     private static boolean structuresLoaded = false;
 
@@ -142,17 +142,21 @@ public class StructureSetLoader {
             DEFAULT_STRUCTURE_FILE.delete();
         }
         try (FileWriter writer = new FileWriter(DEFAULT_STRUCTURE_FILE)) {
-            writer.write("{\n");
-            writer.write("    \"name\": \"example_structure\",\n");
-            writer.write("    \"salt\": " + randomSalt + ",\n");
-            writer.write("    \"separation\": 17,\n");
-            writer.write("    \"spacing\": 20\n");
-            writer.write("    \"y_min\": -32,\n");
-            writer.write("    \"y_max\": 0,\n");
-            writer.write("    \"max_distance\": 35\n");
-            writer.write("}\n");
+            defaultStructureSetJson(writer, "example_dungeon", randomSalt);
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void defaultStructureSetJson(FileWriter writer, String fileName, int randomSalt) throws IOException {
+        writer.write("{\n");
+        writer.write("  \"name\": \"" + fileName.replace(".json", "") + "\",\n");
+        writer.write("    \"salt\": " + randomSalt + ",\n");
+        writer.write("    \"separation\": 17,\n");
+        writer.write("    \"spacing\": 20,\n");
+        writer.write("    \"y_min\": -32,\n");
+        writer.write("    \"y_max\": 0,\n");
+        writer.write("    \"max_distance\": 35\n");
+        writer.write("}\n");
     }
 }

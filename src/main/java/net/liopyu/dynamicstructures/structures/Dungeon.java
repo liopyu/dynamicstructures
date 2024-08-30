@@ -1,7 +1,7 @@
 package net.liopyu.dynamicstructures.structures;
 
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
-import net.liopyu.dynamicstructures.data.json.BlockType;
+import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;

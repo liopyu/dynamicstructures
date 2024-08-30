@@ -4,7 +4,7 @@ import com.mojang.logging.LogUtils;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
-import net.liopyu.dynamicstructures.data.json.BlockType;
+import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -26,7 +26,7 @@ public class DynamicStructures {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         modEventBus.addListener(this::commonSetup);
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.ASPEC);
     }
 
 

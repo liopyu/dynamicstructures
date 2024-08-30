@@ -57,11 +57,12 @@ public class FindStructureCommand {
         dispatcher.register(
                 Commands.literal("dynamicstructures")
                         .then(Commands.literal("locate")
-                                .requires((p_214470_) -> p_214470_.hasPermission(2))
                                 .then(Commands.argument("structureName", StringArgumentType.string())
-                                        .executes(FindStructureCommand::findStructure).suggests(STRUCTURE_NAMES)
+                                        .executes(FindStructureCommand::findStructure)
+                                        .suggests(STRUCTURE_NAMES)
                                 )
                         )
+                        .requires((p_214470_) -> p_214470_.hasPermission(2))
         );
     }
 

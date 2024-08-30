@@ -13,6 +13,8 @@ import net.minecraft.world.InteractionResult;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -347,4 +349,6 @@ public class DSHelperClass {
         DSHelperClass.logWarningMessage("StructureContext with name '" + structureName + "' not found.");
         return null;
     }
+
+
 }

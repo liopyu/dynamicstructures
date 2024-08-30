@@ -5,8 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
-import net.liopyu.dynamicstructures.data.json.BlockType;
-import net.liopyu.dynamicstructures.data.json.KeyWordType;
+import net.liopyu.dynamicstructures.data.enums.BlockType;
+import net.liopyu.dynamicstructures.data.enums.KeyWordType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -17,7 +17,6 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
 
-import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedKeywords;
 import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedBlockTypes;
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
@@ -185,7 +184,6 @@ public class ContextUtils {
         private static final int DEFAULT_WIDTH = 8;
         private static final int DEFAULT_LENGTH = 8;
         private static final int DEFAULT_SIZE_THRESHOLD = 30;
-        private static final boolean DEFAULT_GENERATE_SPAWNERS = false;
         private static final int DEFAULT_MAX_SPAWNERS_PER_ROOM = 1;
         private static final int DEFAULT_MAX_SPAWNERS = 10;
 
@@ -227,14 +225,14 @@ public class ContextUtils {
             String structureName = normalizedJson.has("name") ? normalizedJson.get("name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureLoader.STRUCTURE_DIR);
             if (!normalizedJson.has("name")) {
-                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
+                DSHelperClass.logWarningMessageOnce("'name' is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
             }
-            float ladderChance = normalizedJson.has("ladder_chance") ? normalizedJson.get("ladder_chance").getAsFloat() : DSHelperClass.logDefault("ladder_chance", DEFAULT_LADDER_CHANCE, jsonFilePath);
-            int roomCount = normalizedJson.has("rooms") ? normalizedJson.get("rooms").getAsInt() : DSHelperClass.logDefault("rooms", DEFAULT_ROOM_COUNT, jsonFilePath);
-            int height = normalizedJson.has("height") ? normalizedJson.get("height").getAsInt() : DSHelperClass.logDefault("height", DEFAULT_HEIGHT, jsonFilePath);
-            int width = normalizedJson.has("width") ? normalizedJson.get("width").getAsInt() : DSHelperClass.logDefault("width", DEFAULT_WIDTH, jsonFilePath);
-            int length = normalizedJson.has("length") ? normalizedJson.get("length").getAsInt() : DSHelperClass.logDefault("length", DEFAULT_LENGTH, jsonFilePath);
-            int sizeThreshold = normalizedJson.has("size_threshold") ? normalizedJson.get("size_threshold").getAsInt() : DSHelperClass.logDefault("size_threshold", DEFAULT_SIZE_THRESHOLD, jsonFilePath);
+            float ladderChance = normalizedJson.has("ladder_chance") ? normalizedJson.get("ladder_chance").getAsFloat() : DSHelperClass.logDefault("'ladder_chance'", DEFAULT_LADDER_CHANCE, jsonFilePath);
+            int roomCount = normalizedJson.has("rooms") ? normalizedJson.get("rooms").getAsInt() : DSHelperClass.logDefault("'rooms'", DEFAULT_ROOM_COUNT, jsonFilePath);
+            int height = normalizedJson.has("height") ? normalizedJson.get("height").getAsInt() : DSHelperClass.logDefault("'height'", DEFAULT_HEIGHT, jsonFilePath);
+            int width = normalizedJson.has("width") ? normalizedJson.get("width").getAsInt() : DSHelperClass.logDefault("'width'", DEFAULT_WIDTH, jsonFilePath);
+            int length = normalizedJson.has("length") ? normalizedJson.get("length").getAsInt() : DSHelperClass.logDefault("'length'", DEFAULT_LENGTH, jsonFilePath);
+            int sizeThreshold = normalizedJson.has("size_threshold") ? normalizedJson.get("size_threshold").getAsInt() : DSHelperClass.logDefault("'size_threshold'", DEFAULT_SIZE_THRESHOLD, jsonFilePath);
 
             boolean generateSpawners = false;
             int maxSpawners = DEFAULT_MAX_SPAWNERS;
@@ -244,8 +242,8 @@ public class ContextUtils {
             if (normalizedJson.has("spawners")) {
                 JsonObject spawnersObject = normalizedJson.getAsJsonObject("spawners");
 
-                maxSpawners = spawnersObject.has("max") ? spawnersObject.get("max").getAsInt() : DSHelperClass.logDefault("max", DEFAULT_MAX_SPAWNERS, jsonFilePath);
-                maxSpawnersPerRoom = spawnersObject.has("room_count") ? spawnersObject.get("room_count").getAsInt() : DSHelperClass.logDefault("room_count", DEFAULT_MAX_SPAWNERS_PER_ROOM, jsonFilePath);
+                maxSpawners = spawnersObject.has("max") ? spawnersObject.get("max").getAsInt() : DSHelperClass.logDefault("'max'", DEFAULT_MAX_SPAWNERS, jsonFilePath);
+                maxSpawnersPerRoom = spawnersObject.has("room_count") ? spawnersObject.get("room_count").getAsInt() : DSHelperClass.logDefault("'room_count'", DEFAULT_MAX_SPAWNERS_PER_ROOM, jsonFilePath);
 
                 if (spawnersObject.has("mobs")) {
                     spawnerEntities = new ArrayList<>();
@@ -255,7 +253,7 @@ public class ContextUtils {
                         EntityType.byString(entityName).ifPresent(spawnerEntities::add);
                     }
                 } else {
-                    DSHelperClass.logWarningMessageOnce("Spawner Entities are missing or null in " + jsonFilePath + ". Defaulting to " + DEFAULT_SPAWNER_ENTITIES + ".");
+                    DSHelperClass.logWarningMessageOnce("'mobs' are missing or null in " + jsonFilePath + ". Defaulting to " + DEFAULT_SPAWNER_ENTITIES + ".");
                 }
 
                 generateSpawners = true;
@@ -471,17 +469,17 @@ public class ContextUtils {
          */
         public static SpawnContext fromJson(JsonObject json, String jsonFilePath) {
             JsonObject normalizedJson = normalizeJson(json);
-            String structureName = normalizedJson.has("structure name") ? normalizedJson.get("structure name").getAsString() :
+            String structureName = normalizedJson.has("structure_name") ? normalizedJson.get("structure_name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureSetLoader.STRUCTURE_DIR);
-            if (!normalizedJson.has("structure name")) {
-                DSHelperClass.logWarningMessageOnce("Structure Name is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
+            if (!normalizedJson.has("structure_name")) {
+                DSHelperClass.logWarningMessageOnce("'structure_name' is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
             }
-            long salt = normalizedJson.has("salt") ? normalizedJson.get("salt").getAsLong() : DSHelperClass.logDefault("Salt", DEFAULT_SALT, jsonFilePath);
-            int separation = normalizedJson.has("separation") ? normalizedJson.get("separation").getAsInt() : DSHelperClass.logDefault("Separation", DEFAULT_SEPARATION, jsonFilePath);
-            int spacing = normalizedJson.has("spacing") ? normalizedJson.get("spacing").getAsInt() : DSHelperClass.logDefault("Spacing", DEFAULT_SPACING, jsonFilePath);
-            int yMin = normalizedJson.has("y min") ? normalizedJson.get("y min").getAsInt() : DSHelperClass.logDefault("y Min", DEFAULT_Y_MIN, jsonFilePath);
-            int yMax = normalizedJson.has("y max") ? normalizedJson.get("y max").getAsInt() : DSHelperClass.logDefault("y Max", DEFAULT_Y_MAX, jsonFilePath);
-            int maxDistanceFromCenter = normalizedJson.has("max distance") ? normalizedJson.get("max distance").getAsInt() : DSHelperClass.logDefault("Max Distance", DEFAULT_MAX_DISTANCE_FROM_CENTER, jsonFilePath);
+            long salt = normalizedJson.has("salt") ? normalizedJson.get("salt").getAsLong() : DSHelperClass.logDefault("'salt'", DEFAULT_SALT, jsonFilePath);
+            int separation = normalizedJson.has("separation") ? normalizedJson.get("separation").getAsInt() : DSHelperClass.logDefault("'separation'", DEFAULT_SEPARATION, jsonFilePath);
+            int spacing = normalizedJson.has("spacing") ? normalizedJson.get("spacing").getAsInt() : DSHelperClass.logDefault("'spacing'", DEFAULT_SPACING, jsonFilePath);
+            int yMin = normalizedJson.has("y_min") ? normalizedJson.get("y_min").getAsInt() : DSHelperClass.logDefault("'y_min'", DEFAULT_Y_MIN, jsonFilePath);
+            int yMax = normalizedJson.has("y_max") ? normalizedJson.get("y_max").getAsInt() : DSHelperClass.logDefault("'y_max'", DEFAULT_Y_MAX, jsonFilePath);
+            int maxDistanceFromCenter = normalizedJson.has("max_distance") ? normalizedJson.get("max_distance").getAsInt() : DSHelperClass.logDefault("'max_distance'", DEFAULT_MAX_DISTANCE_FROM_CENTER, jsonFilePath);
             return new SpawnContext(
                     structureName,
                     salt,

@@ -1,4 +1,4 @@
-package net.liopyu.dynamicstructures.data.json;
+package net.liopyu.dynamicstructures.data.enums;
 
 public enum KeyWordType {
     PREDICATE,

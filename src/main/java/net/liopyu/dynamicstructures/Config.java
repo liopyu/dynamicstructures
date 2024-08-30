@@ -16,49 +16,35 @@ import java.util.stream.Collectors;
 // An example config class. This is not required, but it's a good idea to have one to keep your config organized.
 // Demonstrates how to use Forge's config APIs
 @Mod.EventBusSubscriber(modid = DynamicStructures.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
-public class Config
-{
+public class Config {
+
     private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
 
-    private static final ForgeConfigSpec.BooleanValue LOG_DIRT_BLOCK = BUILDER
-            .comment("Whether to log the dirt block on common setup")
-            .define("logDirtBlock", true);
-
-    private static final ForgeConfigSpec.IntValue MAGIC_NUMBER = BUILDER
-            .comment("A magic number")
-            .defineInRange("magicNumber", 42, 0, Integer.MAX_VALUE);
-
-    public static final ForgeConfigSpec.ConfigValue<String> MAGIC_NUMBER_INTRODUCTION = BUILDER
-            .comment("What you want the introduction message to be for the magic number")
-            .define("magicNumberIntroduction", "The magic number is... ");
-
-    // a list of strings that are treated as resource locations for items
-    private static final ForgeConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
-            .comment("A list of items to log on common setup.")
-            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), Config::validateItemName);
-
-    static final ForgeConfigSpec SPEC = BUILDER.build();
-
-    public static boolean logDirtBlock;
-    public static int magicNumber;
-    public static String magicNumberIntroduction;
-    public static Set<Item> items;
-
-    private static boolean validateItemName(final Object obj)
-    {
-        return obj instanceof final String itemName && ForgeRegistries.ITEMS.containsKey(new ResourceLocation(itemName));
-    }
+    private static final ForgeConfigSpec.BooleanValue GENERATE_EXAMPLE_STRUCTURE = BUILDER
+            .comment("Automatically generate an example structure JSON if none exist.")
+            .define("generate_example_structure", true);
+    private static final ForgeConfigSpec.BooleanValue GENERATE_EXAMPLE_STRUCTURE_SET = BUILDER
+            .comment("Automatically generate a dungeon structure_set JSON if none exist.")
+            .comment("This also allows the example structure to spawn in the world.")
+            .define("generate_example_structure_set", false);
+    private static final ForgeConfigSpec.ConfigValue<String> STRUCTURE_LOCATION = BUILDER
+            .comment("File location for structure files.")
+            .define("structure_directory", "config/dynamicstructures/structures/");
+    private static final ForgeConfigSpec.ConfigValue<String> STRUCTURE_SET_LOCATION = BUILDER
+            .comment("File location for structure_set files.")
+            .define("structure_set_directory", "config/dynamicstructures/structure_set/");
+    static final ForgeConfigSpec ASPEC = BUILDER.build();
+    public static boolean generate_example_structure;
+    public static boolean generate_example_structure_set;
+    public static String structure_set_directory;
+    public static String structure_directory;
 
     @SubscribeEvent
-    static void onLoad(final ModConfigEvent event)
-    {
-        logDirtBlock = LOG_DIRT_BLOCK.get();
-        magicNumber = MAGIC_NUMBER.get();
-        magicNumberIntroduction = MAGIC_NUMBER_INTRODUCTION.get();
+    static void onLoad(final ModConfigEvent event) {
+        generate_example_structure = GENERATE_EXAMPLE_STRUCTURE.get();
+        generate_example_structure_set = GENERATE_EXAMPLE_STRUCTURE_SET.get();
+        structure_set_directory = STRUCTURE_SET_LOCATION.get();
+        structure_directory = STRUCTURE_LOCATION.get();
 
-        // convert the list of strings into a set of items
-        items = ITEM_STRINGS.get().stream()
-                .map(itemName -> ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemName)))
-                .collect(Collectors.toSet());
     }
 }

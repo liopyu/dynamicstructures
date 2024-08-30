@@ -43,8 +43,8 @@ public class PlaceStructureCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("dynamicstructures")
+                        .requires((p_214470_) -> p_214470_.hasPermission(2))
                         .then(Commands.literal("place")
-                                .requires((p_214470_) -> p_214470_.hasPermission(2))
                                 .then(Commands.argument("structureName", StringArgumentType.string())
                                         .executes(PlaceStructureCommand::placeStructure).suggests(FindStructureCommand.STRUCTURE_NAMES)
                                 )
