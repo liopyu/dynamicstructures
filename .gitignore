@@ -19,8 +19,19 @@ build
 
 # other
 eclipse
-run
 
+/run/*
 
+!/run/config/
+/run/config/*
 
-/run/
+!/run/config/dynamicstructures/
+!run/config/dynamicstructures/structure_set/**
+!run/config/dynamicstructures/structures/**
+
+/run/config/dynamicstructures/structure_set/*
+/run/config/dynamicstructures/structures/*
+
+!/run/config/dynamicstructures/structure_set/example_dungeon.json
+!/run/config/dynamicstructures/structures/example_dungeon.json
+

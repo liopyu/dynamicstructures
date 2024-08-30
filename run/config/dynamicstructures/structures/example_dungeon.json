@@ -1,0 +1,89 @@
+{
+  "name": "example_dungeon",
+  "ladder_chance": 10,
+  "rooms": 15,
+  "height": 8,
+  "width": 8,
+  "length": 8,
+  "size_threshold": 1,
+  "spawners": {
+    "max": 10,
+    "room_count": 1,
+    "mobs": [
+      "minecraft:zombie",
+      "minecraft:creeper"
+    ]
+  },
+  "walls": {
+    "blocks": [
+      {
+        "block": "minecraft:oak_planks",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:stone_bricks",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:bricks",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:cobblestone",
+        "weight": 10,
+        "predicate": {
+          "biomes": [
+            "minecraft:plains",
+            "minecraft:forest"
+          ]
+        }
+      }
+    ]
+  },
+  "floor": {
+    "blocks": [
+      {
+        "block": "minecraft:stone",
+        "weight": 10,
+        "predicate": {
+          "height": {
+            "min": 0,
+            "max": 256
+          }
+        }
+      },
+      {
+        "block": "minecraft:smooth_stone",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:oak_planks",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:cobblestone",
+        "weight": 10
+      }
+    ]
+  },
+  "roof": {
+    "blocks": [
+      {
+        "block": "minecraft:oak_slab",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:brick_slab",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:stone_slab",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:cobblestone_slab",
+        "weight": 10
+      }
+    ]
+  }
+}
