@@ -43,8 +43,6 @@ public class DefaultStructureCommand {
                 (context, builder) -> SharedSuggestionProvider.suggest(structureTypes, builder));
     }
 
-    public static final File STRUCTURE_DIR = new File(Config.structure_directory);
-    public static final File STRUCTURE_SET_DIR = new File(Config.structure_set_directory);
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
@@ -71,13 +69,13 @@ public class DefaultStructureCommand {
         var fileNameType = "example_" + fileName;
         CommandSourceStack source = context.getSource();
         var filePath = StructureLoader.STRUCTURE_DIR + fileName;
-        File targetDir = new File(STRUCTURE_DIR, fileNameType).getParentFile();
+        File targetDir = new File(StructureLoader.STRUCTURE_DIR, fileNameType).getParentFile();
         if (!targetDir.exists() && !targetDir.mkdirs()) {
             source.sendFailure(Component.literal("Failed to create directories for " + filePath));
             return 0;
         }
 
-        File newStructureFile = new File(STRUCTURE_DIR, fileNameType);
+        File newStructureFile = new File(StructureLoader.STRUCTURE_DIR, fileNameType);
         if (newStructureFile.exists() && !overwrite) {
             source.sendFailure(Component.literal("File already exists: " + filePath));
             return 0;
@@ -106,13 +104,13 @@ public class DefaultStructureCommand {
 
         CommandSourceStack source = context.getSource();
         var filePath = StructureSetLoader.STRUCTURE_DIR + fileName;
-        File targetDir = new File(STRUCTURE_SET_DIR, fileNameType).getParentFile();
+        File targetDir = new File(StructureSetLoader.STRUCTURE_DIR, fileNameType).getParentFile();
         if (!targetDir.exists() && !targetDir.mkdirs()) {
             source.sendFailure(Component.literal("Failed to create directories for " + filePath));
             return 0;
         }
 
-        File newStructureFile = new File(STRUCTURE_SET_DIR, fileNameType);
+        File newStructureFile = new File(StructureSetLoader.STRUCTURE_DIR, fileNameType);
         if (newStructureFile.exists() && !overwrite) {
             source.sendFailure(Component.literal("File already exists: " + filePath));
             return 0;

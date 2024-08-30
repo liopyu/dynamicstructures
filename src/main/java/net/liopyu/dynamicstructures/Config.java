@@ -23,13 +23,13 @@ public class Config {
     private static final ForgeConfigSpec.BooleanValue GENERATE_EXAMPLE_STRUCTURE = BUILDER
             .comment("Automatically generate an example structure JSON if none exist.")
             .define("generate_example_structure", true);
-    private static final ForgeConfigSpec.BooleanValue GENERATE_EXAMPLE_STRUCTURE_SET = BUILDER
-            .comment("Automatically generate a dungeon structure_set JSON if none exist.")
-            .comment("This also allows the example structure to spawn in the world.")
-            .define("generate_example_structure_set", false);
     private static final ForgeConfigSpec.ConfigValue<String> STRUCTURE_LOCATION = BUILDER
             .comment("File location for structure files.")
             .define("structure_directory", "config/dynamicstructures/structures/");
+    private static final ForgeConfigSpec.BooleanValue GENERATE_EXAMPLE_STRUCTURE_SET = BUILDER
+            .comment("Automatically generate a dungeon structure_set JSON if none exist.")
+            .comment("This also allows the example structure to spawn in the world.")
+            .define("generate_example_structure_set", true);
     private static final ForgeConfigSpec.ConfigValue<String> STRUCTURE_SET_LOCATION = BUILDER
             .comment("File location for structure_set files.")
             .define("structure_set_directory", "config/dynamicstructures/structure_set/");

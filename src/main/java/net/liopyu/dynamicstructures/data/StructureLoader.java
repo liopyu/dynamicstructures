@@ -3,6 +3,7 @@ package net.liopyu.dynamicstructures.data;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.liopyu.dynamicstructures.Config;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.server.level.ServerLevel;
@@ -38,7 +39,7 @@ import java.util.Map;
  * </ul>
  */
 public class StructureLoader {
-    public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structures/");
+    public static final File STRUCTURE_DIR = new File(Config.structure_directory);
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_dungeon.json");
     public static Map<String, ContextUtils.StructureContext> cachedStructures = new HashMap<>();
     private static boolean structuresLoaded = false;
@@ -61,7 +62,7 @@ public class StructureLoader {
 
         loadJsonFilesRecursively(STRUCTURE_DIR, cachedStructures);
 
-        if (cachedStructures.isEmpty()) {
+        if (cachedStructures.isEmpty() && Config.generate_example_structure) {
             loadDefaultStructure(cachedStructures);
         }
 
