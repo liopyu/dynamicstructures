@@ -1,11 +1,13 @@
 package net.liopyu.dynamicstructures.structures;
 
+import com.google.gson.JsonObject;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
 import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
@@ -68,29 +70,12 @@ public class Dungeon {
         var random = level.random;
         var blockContext = getStructureContext().getBlockContext();
         blockContext.setLevel(level);
-        for (Map.Entry<BlockType, List<Block>> entry : getStructureContext().getBlockContext().getBlocks().entrySet()) {
-            boolean found = false;
-            switch (entry.getKey()) {
-                case ROOF -> {
-                    roofBlock = selectRandomBlock(entry.getValue(), random);
-                }
-                case WALLS -> {
-                    wallBlock = selectRandomBlock(entry.getValue(), random);
-                }
-                case FLOOR -> {
-                    floorBlock = selectRandomBlock(entry.getValue(), random);
-                }
-                case FILLER -> {
-                    fillerBlock = selectRandomBlock(entry.getValue(), random);
-                }
-                case DOORWAY -> {
-                    doorwayBlock = selectRandomBlock(entry.getValue(), random);
-                }
-                case CENTER -> {
-                    centerBlock = selectRandomBlock(entry.getValue(), random);
-                }
-            }
-        }
+        roofBlock = blockContext.roofBlock;
+        wallBlock = blockContext.wallBlock;
+        floorBlock = blockContext.floorBlock;
+        fillerBlock = blockContext.fillerBlock;
+        doorwayBlock = blockContext.doorwayBlock;
+        centerBlock = blockContext.centerBlock;
         if (roofBlock == null) {
             roofBlock = selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random);
         }
@@ -176,11 +161,44 @@ public class Dungeon {
         getStructureContext().getBlockContext().setPos(pPos);
         var blockKey = getLevel().registryAccess().registryOrThrow(ForgeRegistries.BLOCKS.getRegistryKey());
         var blockName = blockKey.getKey(pNewState.getBlock()).toString();
-        boolean placeBlock = BlockInterpreter.evaluateConditions(blockName, blockType, getStructureContext().getBlockContext());
+        boolean placeBlock = BlockInterpreter.evaluateConditions(pPos, blockName, blockType, getStructureContext().getBlockContext());
         if (placeBlock) {
-            this.getLevel().setBlock(pPos, pNewState, pFlags);
+            var finalBlock = handleBlockPlacement(pPos, blockType, pNewState);
+            this.getLevel().setBlock(pPos, finalBlock, pFlags);
         }
     }
+
+    public BlockState handleBlockPlacement(BlockPos pos, BlockType blockType, BlockState pNewState) {
+        var blockContext = getStructureContext().getBlockContext();
+        if (blockContext.getFunctions().isEmpty() || !blockContext.getFunctions().containsKey(blockType)) {
+            return pNewState;
+        }
+
+        JsonObject functionObject = blockContext.getFunctions().get(blockType);
+        if (functionObject.has("replace")) {
+            JsonObject replaceObject = functionObject.getAsJsonObject("replace");
+            if (replaceObject != null) {
+                String fromBlockName = replaceObject.get("from").getAsString();
+                String toBlockName = replaceObject.get("to").getAsString();
+
+                Block fromBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(fromBlockName));
+                Block toBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(toBlockName));
+
+                if (fromBlock != null && toBlock != null) {
+                    if (level.getBlockState(pos).getBlock() == fromBlock) {
+                        //DSHelperClass.logInfoMessageDev("Replaced " + fromBlockName + " with " + toBlockName + " at " + pos);
+                        return toBlock.defaultBlockState();
+                    }
+                } else {
+                    DSHelperClass.logWarningMessageOnce("Failed replacement: Block registry objects not found for '"
+                            + fromBlockName + "' or '" + toBlockName + "' at " + pos);
+                }
+            }
+        }
+
+        return pNewState;
+    }
+
 
     /**
      * Generates a ladder room within the specified area of the world. The ladder room consists of two stacked rooms connected by a ladder.
@@ -313,12 +331,12 @@ public class Dungeon {
     private void generateWalls(ServerLevel world, BlockPos pos, int width, int length, int height, Block wallBlock, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
         for (int y = 1; y <= height + 1; y++) {
             for (int x = 0; x < width; x++) {
-                addWallBlock(world, pos.offset(x, y, 0), wallBlock, wallPositions, overlapWalls, forceOverlap);
-                addWallBlock(world, pos.offset(x, y, length - 1), wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(pos, wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(pos, wallBlock, wallPositions, overlapWalls, forceOverlap);
             }
             for (int z = 1; z < length - 1; z++) {
-                addWallBlock(world, pos.offset(0, y, z), wallBlock, wallPositions, overlapWalls, forceOverlap);
-                addWallBlock(world, pos.offset(width - 1, y, z), wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(pos, wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(pos, wallBlock, wallPositions, overlapWalls, forceOverlap);
             }
         }
     }
@@ -335,27 +353,53 @@ public class Dungeon {
      * @param overlapWalls  A set of {@link BlockPos} where walls from previous rooms may overlap. Can be {@code null} if not applicable.
      * @param forceOverlap  Whether the wall block should forcibly overlap existing blocks, even if they are not suitable for wall placement.
      */
-    private void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
-        if (roofBlock.equals(world.getBlockState(pos).getBlock()) ||
-                world.getBlockState(pos).getBlock() instanceof LiquidBlock ||
-                world.getBlockState(pos).isAir()) {
+    private void addWallBlock(BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
+        BlockState currentState = level.getBlockState(pos);
+        Block currentBlock = currentState.getBlock();
+
+        // Determine if the current block can be replaced
+        boolean canReplaceBlock = currentBlock instanceof LiquidBlock || (currentState.isAir() && overlapWalls != null && !isSharedWall(pos, overlapWalls)) || roofBlock.equals(currentBlock);
+
+        if (canReplaceBlock || forceOverlap) {
             setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
             wallPositions.add(pos);
-        } else if (forceOverlap) {
-            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
-            wallPositions.add(pos);
-        } else if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
-            setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
-        } else {
-            for (Direction direction : Direction.values()) {
-                BlockPos adjacentPos = pos.relative(direction);
-                if (wallPositions.contains(adjacentPos)) {
-                    setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
-                    return;
-                }
+            return;
+        }
+
+        // Check for overlaps
+        if (overlapWalls != null && overlapWalls.contains(pos)) {
+            if (isSharedWall(pos, overlapWalls)) {
+                setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
+            } else {
+                setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
+                wallPositions.add(pos);
+            }
+            return;
+        }
+
+        // Ensure no adjacent walls
+        boolean hasAdjacentWall = false;
+        for (Direction direction : Direction.values()) {
+            BlockPos adjacentPos = pos.relative(direction);
+            if (wallPositions.contains(adjacentPos)) {
+                hasAdjacentWall = true;
+                break;
             }
         }
+
+        if (!hasAdjacentWall) {
+            setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
+            wallPositions.add(pos);
+        }
     }
+  /*  private void addWallBlock(BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
+        if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        } else {
+            level.setBlock(pos, block.defaultBlockState(), 3);
+            wallPositions.add(pos);
+        }
+    }*/
 
     /**
      * Generates the roof of a room within the specified area of the world. The method places the specified
@@ -393,9 +437,15 @@ public class Dungeon {
      * @param overlapWalls A set of {@link BlockPos} representing walls that may overlap. Used to determine if the wall is shared.
      * @return {@code true} If the wall at the specified position is a shared wall with overlaps on both axes; {@code false} otherwise.
      */
-    private boolean isSharedWall(BlockPos pos, Set<BlockPos> overlapWalls) {
+    /*private boolean isSharedWall(BlockPos pos, Set<BlockPos> overlapWalls) {
         return (overlapWalls.contains(pos.north()) && overlapWalls.contains(pos.south())) ||
                 (overlapWalls.contains(pos.east()) && overlapWalls.contains(pos.west()));
+    }*/
+    private static boolean isSharedWall(BlockPos pos, Set<BlockPos> overlapWalls) {
+        boolean horizontalContinuity = (overlapWalls.contains(pos.north()) && overlapWalls.contains(pos.south())) ||
+                (overlapWalls.contains(pos.east()) && overlapWalls.contains(pos.west()));
+
+        return horizontalContinuity;
     }
 
     /**
@@ -570,7 +620,7 @@ public class Dungeon {
             int length = getRandomSize(baseLength, random, sizeThreshold);
             boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
             if (isLadderRoom) {
-                generateLadderRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, true, currentDirection);
+                generateLadderRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, false, currentDirection);
                 placeDoorway(level, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 BlockPos upperRoomPos = currentPos.above(height);
                 placeDoorway(level, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);

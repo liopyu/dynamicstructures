@@ -7,6 +7,7 @@ import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.data.enums.KeyWordType;
+import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -21,6 +22,20 @@ import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedBlo
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class ContextUtils {
+    private static class WeightedBlock {
+        final Block block;
+        final String blockName;
+        final int weight;
+        final JsonObject blockObject;
+
+        WeightedBlock(Block block, String blockName, int weight, JsonObject blockObject) {
+            this.block = block;
+            this.blockName = blockName;
+            this.weight = weight;
+            this.blockObject = blockObject;
+        }
+    }
+
     public static class BlockContext {
         private final JsonObject json;
         public Block floorBlock;
@@ -31,9 +46,8 @@ public class ContextUtils {
         public Block fillerBlock;
         private ServerLevel level;
         private BlockPos pos;
-        private Map<BlockType, List<Block>> blocks = new HashMap<>();
-        private Map<String, JsonObject> predicates = new HashMap<>();
-        private Map<String, JsonObject> functions = new HashMap<>();
+        private Map<BlockType, JsonObject> predicates = new HashMap<>();
+        private Map<BlockType, JsonObject> functions = new HashMap<>();
 
         public BlockContext(JsonObject normalizedJson) {
             this.json = normalizedJson;
@@ -43,42 +57,86 @@ public class ContextUtils {
                     JsonObject categoryObject = entry.getValue().getAsJsonObject();
                     JsonArray blockArray = categoryObject.getAsJsonArray("blocks");
                     if (blockArray != null) {
-                        for (int i = 0; i < blockArray.size(); i++) {
-                            JsonObject blockObject = blockArray.get(i).getAsJsonObject();
-                            String name = blockObject.get("block").getAsString();
-                            Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
-                            if (block != null) {
-                                Arrays.stream(BlockType.values()).forEach(blockType -> {
-                                    if (key.equalsIgnoreCase(blockType.name())) {
-                                        DSHelperClass.logInfoMessageDev("Adding '" + name + "' to [" + key + "] list.");
-                                        Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
-                                            var keywordString = keyword.name().toLowerCase();
-                                            var combinedString = blockType.name().toLowerCase() + "," + keywordString + "," + name;
-                                            if (blockObject.getAsJsonObject(keywordString) != null) {
-                                                // TODO: remove these from the maps once they're chosen in the future
-                                                switch (keywordString) {
-                                                    case "predicate":
-                                                        DSHelperClass.logInfoMessageDev("Adding '" + keyword.name() + "' to [" + name + "] as predicate: " + combinedString);
-                                                        predicates.put(combinedString, normalizeJson(blockObject.getAsJsonObject(keyword.name().toLowerCase())));
-                                                        break;
-                                                    case "function":
-                                                        DSHelperClass.logInfoMessageDev("Adding '" + keyword.name() + "' to [" + name + "] as function: " + combinedString);
-                                                        functions.put(combinedString, normalizeJson(blockObject.getAsJsonObject(keyword.name().toLowerCase())));
-                                                        break;
-                                                }
-                                            }
-                                        });
-                                        blocks.computeIfAbsent(blockType, k -> new ArrayList<>()).add(block);
-                                    }
-                                });
-                            } else {
-                                DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
+                        List<WeightedBlock> weightedBlocks = new ArrayList<>();
+                        int totalWeight = 0;
+                        if (!blockArray.isEmpty()) {
+                            // Process blocks and calculate cumulative weight
+                            for (int i = 0; i < blockArray.size(); i++) {
+                                JsonObject blockObject = blockArray.get(i).getAsJsonObject();
+                                String name = blockObject.get("block").getAsString();
+                                Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
+                                if (block != null) {
+                                    int weight = blockObject.has("weight") ? blockObject.get("weight").getAsInt() : 1;
+                                    totalWeight += weight;
+                                    weightedBlocks.add(new WeightedBlock(block, name, weight, blockObject));
+                                } else {
+                                    DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
+                                }
                             }
+                        }
+
+                        // Randomly pick a block based on the calculated weights
+                        int randomWeight = totalWeight > 0 ? new Random().nextInt(totalWeight) : 0;
+                        WeightedBlock selectedBlock = null;
+                        for (WeightedBlock weightedBlock : weightedBlocks) {
+                            randomWeight -= weightedBlock.weight;
+                            if (randomWeight < 0) {
+                                selectedBlock = weightedBlock;
+                                break;
+                            }
+                        }
+
+                        if (selectedBlock != null) {
+                            Block block = selectedBlock.block;
+                            JsonObject blockObject = selectedBlock.blockObject;
+                            WeightedBlock finalSelectedBlock = selectedBlock;
+                            Arrays.stream(BlockType.values()).forEach(blockType -> {
+                                if (key.equalsIgnoreCase(blockType.name())) {
+                                    DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.blockName + "' for [" + key + "] list.");
+                                    Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
+                                        var keywordString = keyword.name().toLowerCase();
+                                        if (blockObject.getAsJsonObject(keywordString) != null) {
+                                            JsonObject keywordObject = blockObject.getAsJsonObject(keyword.name().toLowerCase());
+                                            switch (keywordString) {
+                                                case "predicate":
+                                                    DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.blockName + "] as predicate: " + blockType);
+                                                    predicates.put(blockType, normalizeJson(keywordObject));
+                                                    break;
+                                                case "function":
+                                                    DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.blockName + "] as function: " + blockType);
+                                                    functions.put(blockType, normalizeJson(keywordObject));
+                                                    break;
+                                            }
+                                        }
+                                    });
+                                    switch (blockType) {
+                                        case ROOF -> {
+                                            roofBlock = block;
+                                        }
+                                        case WALLS -> {
+                                            wallBlock = block;
+                                        }
+                                        case FLOOR -> {
+                                            floorBlock = block;
+                                        }
+                                        case FILLER -> {
+                                            fillerBlock = block;
+                                        }
+                                        case DOORWAY -> {
+                                            doorwayBlock = block;
+                                        }
+                                        case CENTER -> {
+                                            centerBlock = block;
+                                        }
+                                    }
+                                }
+                            });
                         }
                     }
                 }
             }
         }
+
 
         public Block getWallBlock() {
             return wallBlock;
@@ -128,23 +186,16 @@ public class ContextUtils {
             this.centerBlock = centerBlock;
         }
 
-        public Map<String, JsonObject> getFunctions() {
+        public Map<BlockType, JsonObject> getFunctions() {
             return functions;
         }
 
-        public Map<BlockType, List<Block>> getBlocks() {
-            return blocks;
-        }
 
-        public void setBlocks(Map<BlockType, List<Block>> blocks) {
-            this.blocks = blocks;
-        }
-
-        public Map<String, JsonObject> getPredicates() {
+        public Map<BlockType, JsonObject> getPredicates() {
             return predicates;
         }
 
-        public void setPredicates(Map<String, JsonObject> predicates) {
+        public void setPredicates(Map<BlockType, JsonObject> predicates) {
             this.predicates = predicates;
         }
 
@@ -469,10 +520,10 @@ public class ContextUtils {
          */
         public static SpawnContext fromJson(JsonObject json, String jsonFilePath) {
             JsonObject normalizedJson = normalizeJson(json);
-            String structureName = normalizedJson.has("structure_name") ? normalizedJson.get("structure_name").getAsString() :
+            String structureName = normalizedJson.has("name") ? normalizedJson.get("name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureSetLoader.STRUCTURE_DIR);
-            if (!normalizedJson.has("structure_name")) {
-                DSHelperClass.logWarningMessageOnce("'structure_name' is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
+            if (!normalizedJson.has("name")) {
+                DSHelperClass.logWarningMessageOnce("'name' is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
             }
             long salt = normalizedJson.has("salt") ? normalizedJson.get("salt").getAsLong() : DSHelperClass.logDefault("'salt'", DEFAULT_SALT, jsonFilePath);
             int separation = normalizedJson.has("separation") ? normalizedJson.get("separation").getAsInt() : DSHelperClass.logDefault("'separation'", DEFAULT_SEPARATION, jsonFilePath);

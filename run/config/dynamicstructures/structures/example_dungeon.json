@@ -17,26 +17,8 @@
   "walls": {
     "blocks": [
       {
-        "block": "minecraft:oak_planks",
+        "block": "minecraft:bedrock",
         "weight": 10
-      },
-      {
-        "block": "minecraft:stone_bricks",
-        "weight": 10
-      },
-      {
-        "block": "minecraft:bricks",
-        "weight": 10
-      },
-      {
-        "block": "minecraft:cobblestone",
-        "weight": 10,
-        "predicate": {
-          "biomes": [
-            "minecraft:plains",
-            "minecraft:forest"
-          ]
-        }
       }
     ]
   },
