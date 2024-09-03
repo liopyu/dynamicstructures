@@ -186,7 +186,6 @@ public class Dungeon {
 
                 if (fromBlock != null && toBlock != null) {
                     if (level.getBlockState(pos).getBlock() == fromBlock) {
-                        //DSHelperClass.logInfoMessageDev("Replaced " + fromBlockName + " with " + toBlockName + " at " + pos);
                         return toBlock.defaultBlockState();
                     }
                 } else {
@@ -217,13 +216,11 @@ public class Dungeon {
      * @param forceOverlap     Whether the walls of the room should forcibly overlap existing walls.
      * @param currentDirection The {@link Direction} in which the doorway should be placed.
      */
-    public void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, boolean forceOverlap, Direction currentDirection, Set<BlockPos> overlapWalls) {
-        DSHelperClass.logInfoMessageDev("Generating ladder room at " + basePos + " with width: " + width + ", length: " + length + ", height: " + height);
-        Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, overlapWalls, forceOverlap, true);
+    public void generateLadderRoom(ServerLevel world, BlockPos basePos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Direction currentDirection, Set<BlockPos> overlapWalls) {
+        Set<BlockPos> roomWalls = generateRoom(world, basePos, width, length, height, floorBlock, wallBlock, roofBlock, overlapWalls, true);
 
         Direction ladderFacing = Direction.EAST;
         BlockPos ladderBase = basePos.offset(width / 2 - 1, 1, length / 2 - 1);
-        DSHelperClass.logInfoMessageDev("Placing ladder starting at " + ladderBase);
 
         for (int i = 0; i < height; i++) {
             BlockPos ladderPos = ladderBase.above(i);
@@ -234,14 +231,12 @@ public class Dungeon {
         }
 
         BlockPos topRoomPos = basePos.above(height);
-        DSHelperClass.logInfoMessageDev("Generating upper room for ladder room at " + topRoomPos);
-        Set<BlockPos> upperRoomWalls = generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls, true, false);
+        Set<BlockPos> upperRoomWalls = generateRoom(world, topRoomPos, width, length, height, floorBlock, wallBlock, roofBlock, roomWalls, false);
 
         BlockPos opening = ladderBase.above(height);
         setBlock(opening, Blocks.AIR.defaultBlockState(), 3, BlockType.CENTER);
         placeDoorway(world, basePos, width, length, currentDirection, world.random, defaultDoorwayRadius);
 
-        DSHelperClass.logInfoMessageDev("Ladder room generation completed.");
     }
 
     /**
@@ -262,20 +257,15 @@ public class Dungeon {
      * @param isBottomRoom Whether this room is at the bottom of a structure, in which case a roof is not generated.
      * @return A {@link Set} of {@link BlockPos} representing the positions of the wall blocks that were placed.
      */
-    private Set<BlockPos> generateRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean forceOverlap, boolean isBottomRoom) {
-        DSHelperClass.logInfoMessageDev("Generating room at " + pos + " with width: " + width + ", length: " + length + ", height: " + height);
-
+    private Set<BlockPos> generateRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean isBottomRoom) {
         Set<BlockPos> wallPositions = new HashSet<>();
-        generateWalls(world, pos, width, length, height, wallBlock, wallPositions, overlapWalls, forceOverlap);
-        generateFloor(world, pos, width, length, floorBlock, wallPositions);
+        Set<BlockPos> roofPositions = isBottomRoom ? null : generateRoof(world, pos, width, length, height, roofBlock);
 
-        if (!isBottomRoom) {
-            generateRoof(world, pos, width, length, height, roofBlock);
-        }
+        generateWalls(world, pos, width, length, height, wallBlock, wallPositions, overlapWalls, roofPositions);
+        generateFloor(world, pos, width, length, floorBlock, wallPositions);
 
         fillRoomInteriorWithAir(world, pos, width, length, height, wallPositions);
 
-        DSHelperClass.logInfoMessageDev("Room generation completed at " + pos);
         return wallPositions;
     }
 
@@ -341,27 +331,22 @@ public class Dungeon {
      * @param wallBlock     The {@link Block} type to be used for the walls of the room.
      * @param wallPositions A set of {@link BlockPos} representing the positions of the wall blocks that are placed.
      * @param overlapWalls  A set of {@link BlockPos} where walls from previous rooms may overlap. Can be {@code null} if not applicable.
-     * @param forceOverlap  Whether the walls of the room should forcibly overlap existing walls.
      */
-    private void generateWalls(ServerLevel world, BlockPos pos, int width, int length, int height, Block wallBlock, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
-        DSHelperClass.logInfoMessageDev("Generating walls at " + pos + " with width: " + width + ", length: " + length + ", height: " + height);
-
+    private void generateWalls(ServerLevel world, BlockPos pos, int width, int length, int height, Block wallBlock, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, Set<BlockPos> roofPositions) {
         for (int y = 1; y <= height + 1; y++) {
             for (int x = 0; x < width; x++) {
                 BlockPos wallPos1 = pos.offset(x, y, 0);
                 BlockPos wallPos2 = pos.offset(x, y, length - 1);
-                addWallBlock(world, wallPos1, wallBlock, wallPositions, overlapWalls, forceOverlap);
-                addWallBlock(world, wallPos2, wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(world, wallPos1, wallBlock, wallPositions, overlapWalls, roofPositions);
+                addWallBlock(world, wallPos2, wallBlock, wallPositions, overlapWalls, roofPositions);
             }
             for (int z = 1; z < length - 1; z++) {
                 BlockPos wallPos1 = pos.offset(0, y, z);
                 BlockPos wallPos2 = pos.offset(width - 1, y, z);
-                addWallBlock(world, wallPos1, wallBlock, wallPositions, overlapWalls, forceOverlap);
-                addWallBlock(world, wallPos2, wallBlock, wallPositions, overlapWalls, forceOverlap);
+                addWallBlock(world, wallPos1, wallBlock, wallPositions, overlapWalls, roofPositions);
+                addWallBlock(world, wallPos2, wallBlock, wallPositions, overlapWalls, roofPositions);
             }
         }
-
-        DSHelperClass.logInfoMessageDev("Wall generation completed at " + pos);
     }
 
     /**
@@ -376,23 +361,25 @@ public class Dungeon {
      * @param overlapWalls  A set of {@link BlockPos} where walls from previous rooms may overlap. Can be {@code null} if not applicable.
      * @param forceOverlap  Whether the wall block should forcibly overlap existing blocks, even if they are not suitable for wall placement.
      */
-    private void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, boolean forceOverlap) {
+    private void addWallBlock(ServerLevel world, BlockPos pos, Block block, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, Set<BlockPos> roofPositions) {
         BlockState currentState = world.getBlockState(pos);
         Block currentBlock = currentState.getBlock();
 
-        // Determine if the current block can be replaced
-        boolean canReplaceBlock = currentBlock instanceof LiquidBlock || currentState.isAir() || roofBlock.equals(currentBlock);
+        boolean canReplaceBlock =
+                currentBlock instanceof LiquidBlock ||
+                        currentState.isAir() ||
+                        (roofPositions != null &&
+                                roofPositions.contains(pos) &&
+                                roofBlock.equals(currentBlock));
 
-        if (canReplaceBlock || forceOverlap) {
+        if (canReplaceBlock) {
             setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
             wallPositions.add(pos);
             return;
         }
 
-        // Handle overlaps
         if (overlapWalls != null && overlapWalls.contains(pos)) {
             if (isSharedWall(pos, overlapWalls)) {
-                // Leave the shared wall as air to prevent overlaps
                 setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
             } else {
                 setBlock(pos, block.defaultBlockState(), 3, BlockType.WALLS);
@@ -438,20 +425,24 @@ public class Dungeon {
      * @param height    The height of the room, which determines the elevation of the roof.
      * @param roofBlock The {@link Block} type to be used for the roof of the room.
      */
-    private void generateRoof(ServerLevel world, BlockPos pos, int width, int length, int height, Block roofBlock) {
+    private Set<BlockPos> generateRoof(ServerLevel world, BlockPos pos, int width, int length, int height, Block roofBlock) {
+        Set<BlockPos> roofPositions = new HashSet<>();
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos roofPos = pos.offset(x, height + 1, z);
-                if (!(world.getBlockState(roofPos).getBlock() instanceof LiquidBlock ||
-                        world.getBlockState(roofPos).is(Blocks.AIR) ||
+                if (world.getBlockState(roofPos).getBlock() instanceof LiquidBlock ||
+                        world.getBlockState(roofPos).isAir() ||
                         world.getBlockState(roofPos).is(Blocks.CAVE_AIR) ||
-                        wallBlock.equals(world.getBlockState(roofPos).getBlock()))) {
-                    continue;
+                        wallBlock.equals(world.getBlockState(roofPos).getBlock())) {
+
+                    setBlock(roofPos, roofBlock.defaultBlockState(), 3, BlockType.ROOF);
+                    roofPositions.add(roofPos);
                 }
-                setBlock(roofPos, roofBlock.defaultBlockState(), 3, BlockType.ROOF);
             }
         }
+        return roofPositions;
     }
+
 
     /**
      * Determines whether a wall at the specified {@link BlockPos} is a shared wall, meaning it has overlapping
@@ -524,10 +515,10 @@ public class Dungeon {
                             return;
                         }
                         if (!world.getBlockState(doorPos).is(Blocks.LADDER)) {
-                            setBlock(doorPos, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
+                            setBlock(doorPos, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
                         }
                         if (!world.getBlockState(doorPosTop).is(Blocks.LADDER)) {
-                            setBlock(doorPosTop, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
+                            setBlock(doorPosTop, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
                         }
                     }
                 }
@@ -542,8 +533,8 @@ public class Dungeon {
                     if (roofBlock.equals(world.getBlockState(outwardPos).getBlock())) {
                         return;
                     }
-                    setBlock(doorPos, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
-                    setBlock(doorPosTop, fillerBlock.defaultBlockState(), 3, BlockType.DOORWAY);
+                    setBlock(doorPos, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
+                    setBlock(doorPosTop, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
                 }
             }
             default -> {
@@ -641,18 +632,15 @@ public class Dungeon {
         BlockPos currentPos = startPos;
         Direction currentDirection = startDirection;
 
-        DSHelperClass.logInfoMessageDev("Starting dungeon generation. Total rooms: " + roomCount);
 
         for (int i = 0; i < roomCount; i++) {
             int width = getRandomSize(baseWidth, random, sizeThreshold);
             int length = getRandomSize(baseLength, random, sizeThreshold);
             boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
 
-            DSHelperClass.logInfoMessageDev("Generating room " + (i + 1) + " at position " + currentPos + ", width: " + width + ", length: " + length);
 
             if (isLadderRoom) {
-                DSHelperClass.logInfoMessageDev("Room " + (i + 1) + " is a ladder room.");
-                generateLadderRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, false, currentDirection, previousRoomWalls);
+                generateLadderRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, currentDirection, previousRoomWalls);
                 placeDoorway(level, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 BlockPos upperRoomPos = currentPos.above(height);
                 placeDoorway(level, upperRoomPos, width, length, currentDirection, random, defaultDoorwayRadius);
@@ -662,8 +650,7 @@ public class Dungeon {
                 }
                 currentPos = calculateNextRoomPos(upperRoomPos, width, length, currentDirection);
             } else {
-                DSHelperClass.logInfoMessageDev("Room " + (i + 1) + " is a regular room.");
-                Set<BlockPos> currentRoomWalls = generateRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false, false);
+                Set<BlockPos> currentRoomWalls = generateRoom(level, currentPos, width, length, height, floorBlock, wallBlock, roofBlock, previousRoomWalls, false);
                 previousRoomWalls = currentRoomWalls;
                 placeDoorway(level, currentPos, width, length, currentDirection, random, defaultDoorwayRadius);
                 if (generatesSpawners) {
@@ -673,9 +660,6 @@ public class Dungeon {
             }
 
             currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
-            DSHelperClass.logInfoMessageDev("Next room direction: " + currentDirection);
         }
-
-        DSHelperClass.logInfoMessageDev("Dungeon generation completed.");
     }
 }

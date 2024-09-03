@@ -209,6 +209,7 @@ public class StructureLoader {
         writer.write("          \"height\": {\n");
         writer.write("            \"min\": 0,\n");
         writer.write("            \"max\": 256\n");
+        writer.write("            }\n");
         writer.write("          },\n");
         writer.write("        \"function\": {\n");
         writer.write("          \"replace\": {\n");

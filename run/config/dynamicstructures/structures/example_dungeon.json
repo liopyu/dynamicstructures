@@ -1,11 +1,11 @@
 {
   "name": "example_dungeon",
-  "ladder_chance": 10,
-  "rooms": 15,
-  "height": 8,
-  "width": 8,
-  "length": 8,
-  "size_threshold": 1,
+  "ladder_chance": 0,
+  "rooms": 8,
+  "height": 80,
+  "width": 100,
+  "length": 58,
+  "size_threshold": 30,
   "spawners": {
     "max": 10,
     "room_count": 1,
@@ -17,8 +17,26 @@
   "walls": {
     "blocks": [
       {
-        "block": "minecraft:bedrock",
+        "block": "minecraft:oak_planks",
         "weight": 10
+      },
+      {
+        "block": "minecraft:stone_bricks",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:bricks",
+        "weight": 10
+      },
+      {
+        "block": "minecraft:cobblestone",
+        "weight": 10,
+        "predicate": {
+          "biomes": [
+            "minecraft:plains",
+            "minecraft:forest"
+          ]
+        }
       }
     ]
   },
@@ -31,6 +49,12 @@
           "height": {
             "min": 0,
             "max": 256
+          }
+        },
+        "function": {
+          "replace": {
+            "from": "minecraft:deepslate",
+            "to": "minecraft:diamond_block"
           }
         }
       },

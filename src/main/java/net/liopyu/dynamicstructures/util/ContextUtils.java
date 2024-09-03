@@ -75,7 +75,6 @@ public class ContextUtils {
                             }
                         }
 
-                        // Randomly pick a block based on the calculated weights
                         int randomWeight = totalWeight > 0 ? new Random().nextInt(totalWeight) : 0;
                         WeightedBlock selectedBlock = null;
                         for (WeightedBlock weightedBlock : weightedBlocks) {
@@ -122,7 +121,7 @@ public class ContextUtils {
                                         case FILLER -> {
                                             fillerBlock = block;
                                         }
-                                        case DOORWAY -> {
+                                        case DOOR -> {
                                             doorwayBlock = block;
                                         }
                                         case CENTER -> {

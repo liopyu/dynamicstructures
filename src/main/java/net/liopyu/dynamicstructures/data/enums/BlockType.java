@@ -6,5 +6,5 @@ public enum BlockType {
     ROOF,
     CENTER,
     FILLER,
-    DOORWAY
+    DOOR
 }
