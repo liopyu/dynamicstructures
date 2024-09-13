@@ -1,11 +1,11 @@
 {
   "name": "example_dungeon",
-  "ladder_chance": 0,
-  "rooms": 8,
-  "height": 80,
-  "width": 100,
-  "length": 58,
-  "size_threshold": 30,
+  "ladder_chance": 10,
+  "rooms": 15,
+  "height": 8,
+  "width": 8,
+  "length": 8,
+  "size_threshold": 1,
   "spawners": {
     "max": 10,
     "room_count": 1,
@@ -88,6 +88,15 @@
       },
       {
         "block": "minecraft:cobblestone_slab",
+        "weight": 10
+      }
+    ]
+  },
+  "door": {
+    "radius": 1,
+    "blocks": [
+      {
+        "block": "minecraft:glass",
         "weight": 10
       }
     ]

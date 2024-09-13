@@ -8,7 +8,13 @@ import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.common.Tags;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
@@ -17,13 +23,40 @@ import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class BlockInterpreter {
     public static List<String> allowedBlockTypes = new ArrayList<>();
-    public static List<String> allowedKeywords = new ArrayList<>();
 
+    public static BlockState handleBlockPlacement(BlockPos pos, BlockType blockType, BlockState pNewState, ContextUtils.BlockContext blockContext) {
+        if (blockContext.getFunctions().isEmpty() || !blockContext.getFunctions().containsKey(blockType)) {
+            return pNewState;
+        }
+
+        JsonObject functionObject = blockContext.getFunctions().get(blockType);
+        if (functionObject.has("replace")) {
+            JsonObject replaceObject = functionObject.getAsJsonObject("replace");
+            if (replaceObject != null) {
+                String fromBlockName = replaceObject.get("from").getAsString();
+                String toBlockName = replaceObject.get("to").getAsString();
+
+                Block fromBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(fromBlockName));
+                Block toBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(toBlockName));
+
+                if (fromBlock != null && toBlock != null) {
+                    if (blockContext.getLevel().getBlockState(pos).getBlock() == fromBlock) {
+                        return toBlock.defaultBlockState();
+                    }
+                } else {
+                    DSHelperClass.logWarningMessageOnce("Failed replacement: Block registry objects not found for '"
+                            + fromBlockName + "' or '" + toBlockName + "' at " + pos);
+                }
+            }
+        }
+
+        return pNewState;
+    }
 
     public static boolean evaluateConditions(BlockPos blockPos, String blockName, BlockType blockType, ContextUtils.BlockContext context) {
-        var currentBiome = (context.getLevel().getBiome(blockPos)).get();
+        var currentBiome = (context.getLevel().getBiome(blockPos));
         var biomeKey = context.getLevel().registryAccess().registryOrThrow(ForgeRegistries.BIOMES.getRegistryKey());
-        var biomeName = biomeKey.getKey(currentBiome).toString();
+        var biomeName = biomeKey.getKey(currentBiome.get()).toString();
         int currentHeight = blockPos.getY();
 
         boolean biomeConditionMet = true;
@@ -36,6 +69,10 @@ public class BlockInterpreter {
                 biomeConditionMet = false;
                 for (JsonElement biomeElement : biomesArray) {
                     if (biomeElement.getAsString().equalsIgnoreCase(biomeName.toLowerCase())) {
+                        biomeConditionMet = true;
+                        break;
+                    } else if (biomeElement.getAsString().startsWith("#") &&
+                            currentBiome.is(new ResourceLocation(biomeElement.getAsString().toLowerCase().replaceFirst("#", "")))) {
                         biomeConditionMet = true;
                         break;
                     }

@@ -22,28 +22,29 @@ import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedBlo
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class ContextUtils {
-    private static class WeightedBlock {
-        final Block block;
-        final String blockName;
-        final int weight;
-        final JsonObject blockObject;
+    public static class WeightedBlock {
+        public Block block;
+        public final int weight;
+        public final JsonObject blockObject;
+        public BlockType blockType;
 
-        WeightedBlock(Block block, String blockName, int weight, JsonObject blockObject) {
+        public WeightedBlock(Block block, int weight, JsonObject blockObject, BlockType blockType) {
             this.block = block;
-            this.blockName = blockName;
             this.weight = weight;
             this.blockObject = blockObject;
+            this.blockType = blockType;
         }
     }
 
     public static class BlockContext {
         private final JsonObject json;
-        public Block floorBlock;
-        public Block wallBlock;
-        public Block roofBlock;
-        public Block centerBlock;
-        public Block doorwayBlock;
-        public Block fillerBlock;
+        public WeightedBlock floorBlock;
+        public WeightedBlock wallBlock;
+        public WeightedBlock roofBlock;
+        public WeightedBlock centerBlock;
+        public WeightedBlock doorwayBlock;
+        public WeightedBlock fillerBlock;
+        public int defaultDoorwayRadius = 1;
         private ServerLevel level;
         private BlockPos pos;
         private Map<BlockType, JsonObject> predicates = new HashMap<>();
@@ -56,11 +57,17 @@ public class ContextUtils {
                 if (allowedBlockTypes.contains(key)) {
                     JsonObject categoryObject = entry.getValue().getAsJsonObject();
                     JsonArray blockArray = categoryObject.getAsJsonArray("blocks");
+
+                    if (key.equalsIgnoreCase("door")) {
+                        JsonElement doorRadius = categoryObject.get("radius");
+                        if (doorRadius != null) {
+                            defaultDoorwayRadius = doorRadius.getAsInt();
+                        }
+                    }
                     if (blockArray != null) {
                         List<WeightedBlock> weightedBlocks = new ArrayList<>();
                         int totalWeight = 0;
                         if (!blockArray.isEmpty()) {
-                            // Process blocks and calculate cumulative weight
                             for (int i = 0; i < blockArray.size(); i++) {
                                 JsonObject blockObject = blockArray.get(i).getAsJsonObject();
                                 String name = blockObject.get("block").getAsString();
@@ -68,7 +75,7 @@ public class ContextUtils {
                                 if (block != null) {
                                     int weight = blockObject.has("weight") ? blockObject.get("weight").getAsInt() : 1;
                                     totalWeight += weight;
-                                    weightedBlocks.add(new WeightedBlock(block, name, weight, blockObject));
+                                    weightedBlocks.add(new WeightedBlock(block, weight, blockObject, BlockType.valueOf(entry.getKey().toUpperCase())));
                                 } else {
                                     DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
                                 }
@@ -86,50 +93,48 @@ public class ContextUtils {
                         }
 
                         if (selectedBlock != null) {
-                            Block block = selectedBlock.block;
                             JsonObject blockObject = selectedBlock.blockObject;
                             WeightedBlock finalSelectedBlock = selectedBlock;
-                            Arrays.stream(BlockType.values()).forEach(blockType -> {
-                                if (key.equalsIgnoreCase(blockType.name())) {
-                                    DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.blockName + "' for [" + key + "] list.");
-                                    Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
-                                        var keywordString = keyword.name().toLowerCase();
-                                        if (blockObject.getAsJsonObject(keywordString) != null) {
-                                            JsonObject keywordObject = blockObject.getAsJsonObject(keyword.name().toLowerCase());
-                                            switch (keywordString) {
-                                                case "predicate":
-                                                    DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.blockName + "] as predicate: " + blockType);
-                                                    predicates.put(blockType, normalizeJson(keywordObject));
-                                                    break;
-                                                case "function":
-                                                    DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.blockName + "] as function: " + blockType);
-                                                    functions.put(blockType, normalizeJson(keywordObject));
-                                                    break;
-                                            }
-                                        }
-                                    });
-                                    switch (blockType) {
-                                        case ROOF -> {
-                                            roofBlock = block;
-                                        }
-                                        case WALLS -> {
-                                            wallBlock = block;
-                                        }
-                                        case FLOOR -> {
-                                            floorBlock = block;
-                                        }
-                                        case FILLER -> {
-                                            fillerBlock = block;
-                                        }
-                                        case DOOR -> {
-                                            doorwayBlock = block;
-                                        }
-                                        case CENTER -> {
-                                            centerBlock = block;
+                            var blockType = finalSelectedBlock.blockType;
+                            if (key.equalsIgnoreCase(blockType.name())) {
+                                DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.block + "' for [" + key + "] list.");
+                                Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
+                                    var keywordString = keyword.name().toLowerCase();
+                                    if (blockObject.getAsJsonObject(keywordString) != null) {
+                                        JsonObject keywordObject = blockObject.getAsJsonObject(keyword.name().toLowerCase());
+                                        switch (keywordString) {
+                                            case "predicate":
+                                                DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as predicate: " + blockType);
+                                                predicates.put(blockType, normalizeJson(keywordObject));
+                                                break;
+                                            case "function":
+                                                DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as function: " + blockType);
+                                                functions.put(blockType, normalizeJson(keywordObject));
+                                                break;
                                         }
                                     }
+                                });
+                                switch (blockType) {
+                                    case ROOF -> {
+                                        roofBlock = finalSelectedBlock;
+                                    }
+                                    case WALLS -> {
+                                        wallBlock = finalSelectedBlock;
+                                    }
+                                    case FLOOR -> {
+                                        floorBlock = finalSelectedBlock;
+                                    }
+                                    case FILLER -> {
+                                        fillerBlock = finalSelectedBlock;
+                                    }
+                                    case DOOR -> {
+                                        doorwayBlock = finalSelectedBlock;
+                                    }
+                                    case CENTER -> {
+                                        centerBlock = finalSelectedBlock;
+                                    }
                                 }
-                            });
+                            }
                         }
                     }
                 }
@@ -137,51 +142,51 @@ public class ContextUtils {
         }
 
 
-        public Block getWallBlock() {
+        public WeightedBlock getWallBlock() {
             return wallBlock;
         }
 
-        public void setWallBlock(Block wallBlock) {
+        public void setWallBlock(WeightedBlock wallBlock) {
             this.wallBlock = wallBlock;
         }
 
-        public Block getRoofBlock() {
+        public WeightedBlock getRoofBlock() {
             return roofBlock;
         }
 
-        public void setRoofBlock(Block roofBlock) {
+        public void setRoofBlock(WeightedBlock roofBlock) {
             this.roofBlock = roofBlock;
         }
 
-        public Block getFloorBlock() {
+        public WeightedBlock getFloorBlock() {
             return floorBlock;
         }
 
-        public void setFloorBlock(Block floorBlock) {
+        public void setFloorBlock(WeightedBlock floorBlock) {
             this.floorBlock = floorBlock;
         }
 
-        public Block getFillerBlock() {
+        public WeightedBlock getFillerBlock() {
             return fillerBlock;
         }
 
-        public void setFillerBlock(Block fillerBlock) {
+        public void setFillerBlock(WeightedBlock fillerBlock) {
             this.fillerBlock = fillerBlock;
         }
 
-        public Block getDoorwayBlock() {
+        public WeightedBlock getDoorwayBlock() {
             return doorwayBlock;
         }
 
-        public void setDoorwayBlock(Block doorwayBlock) {
+        public void setDoorwayBlock(WeightedBlock doorwayBlock) {
             this.doorwayBlock = doorwayBlock;
         }
 
-        public Block getCenterBlock() {
+        public WeightedBlock getCenterBlock() {
             return centerBlock;
         }
 
-        public void setCenterBlock(Block centerBlock) {
+        public void setCenterBlock(WeightedBlock centerBlock) {
             this.centerBlock = centerBlock;
         }
 
