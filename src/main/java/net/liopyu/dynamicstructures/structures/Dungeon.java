@@ -180,17 +180,17 @@ public class Dungeon {
         BlockPos ladderBase = basePos.offset(width / 2 - 1, 1, length / 2 - 1);
 
         for (int i = 0; i < height; i++) {
-            BlockPos ladderPos = ladderBase.above(i);
+            BlockPos ladderPos = ladderBase.above(i + 1);
             BlockState ladderState = Blocks.LADDER.defaultBlockState()
                     .setValue(LadderBlock.FACING, ladderFacing)
                     .setValue(LadderBlock.WATERLOGGED, false);
             setBlock(ladderPos, ladderState, 3, BlockType.CENTER);
         }
 
-        BlockPos topRoomPos = basePos.above(height);
+        BlockPos topRoomPos = basePos.above(height + 1);
         Set<BlockPos> upperRoomWalls = generateRoom(topRoomPos, roomWalls, false);
 
-        BlockPos opening = ladderBase.above(height);
+        BlockPos opening = ladderBase.above(height + 1);
         setBlock(opening, Blocks.AIR.defaultBlockState(), 3, BlockType.CENTER);
         placeDoorway(basePos, currentDirection, level.random);
 
@@ -451,7 +451,7 @@ public class Dungeon {
             if (isLadderRoom) {
                 generateLadderRoom(currentPos, currentDirection, previousRoomWalls);
                 placeDoorway(currentPos, currentDirection, random);
-                BlockPos upperRoomPos = currentPos.above(height);
+                BlockPos upperRoomPos = currentPos.above(height + 1);
                 placeDoorway(upperRoomPos, currentDirection, random);
                 if (generatesSpawners) {
                     placeSpawners(currentPos, random);
