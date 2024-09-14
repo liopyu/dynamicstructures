@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.liopyu.dynamicstructures.data.enums.BlockType;
+import net.liopyu.dynamicstructures.data.enums.KeyWordType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
@@ -93,5 +94,96 @@ public class BlockInterpreter {
         return biomeConditionMet && heightConditionMet && existingBlockConditionMet;
     }
 
+    public static void interpretBlockContext(JsonObject normalizedJson, ContextUtils.BlockContext context) {
+        for (Map.Entry<String, JsonElement> entry : normalizedJson.entrySet()) {
+            String key = entry.getKey().toLowerCase();
+            if (allowedBlockTypes.contains(key)) {
+                JsonObject categoryObject = entry.getValue().getAsJsonObject();
+                JsonArray blockArray = categoryObject.getAsJsonArray("blocks");
+
+                if (key.equalsIgnoreCase("door")) {
+                    JsonElement doorRadius = categoryObject.get("radius");
+                    if (doorRadius != null) {
+                        context.defaultDoorwayRadius = doorRadius.getAsInt();
+                    }
+                }
+                if (blockArray != null) {
+                    context.weightedBlocks = new ArrayList<>();
+                    int totalWeight = 0;
+                    if (!blockArray.isEmpty()) {
+                        for (int i = 0; i < blockArray.size(); i++) {
+                            JsonObject blockObject = blockArray.get(i).getAsJsonObject();
+                            String name = blockObject.get("block").getAsString();
+                            Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
+                            if (block != null) {
+                                int weight = blockObject.has("weight") ? blockObject.get("weight").getAsInt() : 1;
+                                totalWeight += weight;
+                                DSHelperClass.logInfoMessageDev("adding weight " + blockObject);
+                                context.weightedBlocks.add(new ContextUtils.WeightedBlock(block, weight, blockObject, BlockType.valueOf(entry.getKey().toUpperCase())));
+                            } else {
+                                DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
+                            }
+                        }
+                    }
+
+                    int randomWeight = totalWeight > 0 ? new Random().nextInt(totalWeight) : 0;
+                    ContextUtils.WeightedBlock selectedBlock = null;
+                    for (ContextUtils.WeightedBlock weightedBlock : context.weightedBlocks) {
+                        randomWeight -= weightedBlock.weight;
+                        if (randomWeight < 0) {
+                            selectedBlock = weightedBlock;
+                            break;
+                        }
+                    }
+
+                    if (selectedBlock != null) {
+                        JsonObject blockObject = selectedBlock.blockObject;
+                        ContextUtils.WeightedBlock finalSelectedBlock = selectedBlock;
+                        var blockType = finalSelectedBlock.blockType;
+                        if (key.equalsIgnoreCase(blockType.name())) {
+                            DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.block + "' for [" + key + "] list.");
+                            Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
+                                var keywordString = keyword.name().toLowerCase();
+                                if (blockObject.getAsJsonObject(keywordString) != null) {
+                                    JsonObject keywordObject = blockObject.getAsJsonObject(keyword.name().toLowerCase());
+                                    switch (keywordString) {
+                                        case "predicate":
+                                            DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as predicate: " + blockType);
+                                            context.getPredicates().put(blockType, normalizeJson(keywordObject));
+                                            break;
+                                        case "function":
+                                            DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as function: " + blockType);
+                                            context.getFunctions().put(blockType, normalizeJson(keywordObject));
+                                            break;
+                                    }
+                                }
+                            });
+                            switch (blockType) {
+                                case ROOF -> {
+                                    context.roofBlock = finalSelectedBlock;
+                                }
+                                case WALLS -> {
+                                    context.wallBlock = finalSelectedBlock;
+                                }
+                                case FLOOR -> {
+                                    context.floorBlock = finalSelectedBlock;
+                                }
+                                case FILLER -> {
+                                    context.fillerBlock = finalSelectedBlock;
+                                }
+                                case DOOR -> {
+                                    context.doorwayBlock = finalSelectedBlock;
+                                }
+                                case CENTER -> {
+                                    context.centerBlock = finalSelectedBlock;
+                                }
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+    }
 
 }

@@ -1,6 +1,7 @@
 package net.liopyu.dynamicstructures.structures;
 
 import com.google.gson.JsonObject;
+import net.liopyu.dynamicstructures.data.enums.KeyWordType;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
 import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.util.ContextUtils;
@@ -21,6 +22,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
+
+import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class Dungeon {
     public static final Block[] WALL_BLOCKS = {
@@ -74,7 +77,8 @@ public class Dungeon {
         this.structureContext = structureContext;
         this.level = level;
         var random = level.random;
-        var blockContext = getStructureContext().getBlockContext();
+        var blockContext = new ContextUtils.BlockContext(structureContext.normalizedJson);
+        structureContext.setBlockContext(blockContext);
         blockContext.setLevel(level);
         roofBlockW = blockContext.roofBlock;
         wallBlockW = blockContext.wallBlock;
@@ -102,12 +106,12 @@ public class Dungeon {
             wallBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random), 1, null, BlockType.WALLS);
         }
 
-        blockContext.setRoofBlock(roofBlockW);
-        blockContext.setWallBlock(wallBlockW);
-        blockContext.setCenterBlock(centerBlockW);
-        blockContext.setDoorwayBlock(doorwayBlockW);
-        blockContext.setFillerBlock(fillerBlockW);
-        blockContext.setFloorBlock(floorBlockW);
+        blockContext.roofBlock = roofBlockW;
+        blockContext.wallBlock = wallBlockW;
+        blockContext.centerBlock = centerBlockW;
+        blockContext.doorwayBlock = doorwayBlockW;
+        blockContext.fillerBlock = fillerBlockW;
+        blockContext.floorBlock = floorBlockW;
 
         roofBlock = blockContext.roofBlock.block;
         wallBlock = blockContext.wallBlock.block;
@@ -231,7 +235,7 @@ public class Dungeon {
                 for (int y = 1; y <= height; y++) {
                     BlockPos blockPos = pos.offset(x, y, z);
                     if (!wallPositions.contains(blockPos)) {
-                        setBlock(blockPos, fillerBlock.defaultBlockState(), 3, BlockType.FILLER);
+                        setBlock(blockPos, fillerBlockW, 3);
                     }
                 }
             }
@@ -246,7 +250,7 @@ public class Dungeon {
                 if (level.getBlockState(floorPos).getBlock() instanceof LadderBlock) {
                     setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3, BlockType.FLOOR);
                 } else if (!wallPositions.contains(floorPos)) {
-                    setBlock(floorPos, floorBlock.defaultBlockState(), 3, BlockType.FLOOR);
+                    setBlock(floorPos, floorBlockW, 3);
                 }
             }
         }
@@ -281,7 +285,7 @@ public class Dungeon {
                                 roofBlock.equals(currentBlock));
 
         if (canReplaceBlock) {
-            setBlock(pos, wallBlock.defaultBlockState(), 3, BlockType.WALLS);
+            setBlock(pos, wallBlockW, 3);
             wallPositions.add(pos);
             return;
         }
@@ -290,7 +294,7 @@ public class Dungeon {
             if (isSharedWall(pos, overlapWalls)) {
                 setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
             } else {
-                setBlock(pos, wallBlock.defaultBlockState(), 3, BlockType.WALLS);
+                setBlock(pos, wallBlockW, 3);
                 wallPositions.add(pos);
             }
             return;
@@ -308,7 +312,7 @@ public class Dungeon {
 
         // Only place the wall block if there's no adjacent wall
         if (!hasAdjacentWall) {
-            setBlock(pos, wallBlock.defaultBlockState(), 3, BlockType.WALLS);
+            setBlock(pos, wallBlockW, 3);
             wallPositions.add(pos);
         }
     }
@@ -332,7 +336,7 @@ public class Dungeon {
                         level.getBlockState(roofPos).is(Blocks.CAVE_AIR) ||
                         wallBlock.equals(level.getBlockState(roofPos).getBlock())) {
 
-                    setBlock(roofPos, roofBlock.defaultBlockState(), 3, BlockType.ROOF);
+                    setBlock(roofPos, roofBlockW, 3);
                     roofPositions.add(roofPos);
                 }
             }
@@ -371,10 +375,10 @@ public class Dungeon {
                             return;
                         }
                         if (!level.getBlockState(doorPos).is(Blocks.LADDER)) {
-                            setBlock(doorPos, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
+                            setBlock(doorPos, doorwayBlockW, 3);
                         }
                         if (!level.getBlockState(doorPosTop).is(Blocks.LADDER)) {
-                            setBlock(doorPosTop, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
+                            setBlock(doorPosTop, doorwayBlockW, 3);
                         }
                     }
                 }
@@ -389,8 +393,8 @@ public class Dungeon {
                     if (roofBlock.equals(level.getBlockState(outwardPos).getBlock())) {
                         return;
                     }
-                    setBlock(doorPos, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
-                    setBlock(doorPosTop, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
+                    setBlock(doorPos, doorwayBlockW, 3);
+                    setBlock(doorPosTop, doorwayBlockW, 3);
                 }
             }
             default -> {

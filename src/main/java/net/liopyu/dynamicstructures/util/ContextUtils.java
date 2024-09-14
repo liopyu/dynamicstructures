@@ -38,156 +38,22 @@ public class ContextUtils {
 
     public static class BlockContext {
         private final JsonObject json;
+        public int defaultDoorwayRadius = 1;
+        private ServerLevel level;
+        private BlockPos pos;
         public WeightedBlock floorBlock;
         public WeightedBlock wallBlock;
         public WeightedBlock roofBlock;
         public WeightedBlock centerBlock;
         public WeightedBlock doorwayBlock;
         public WeightedBlock fillerBlock;
-        public int defaultDoorwayRadius = 1;
-        private ServerLevel level;
-        private BlockPos pos;
         private Map<BlockType, JsonObject> predicates = new HashMap<>();
         private Map<BlockType, JsonObject> functions = new HashMap<>();
+        public List<WeightedBlock> weightedBlocks = new ArrayList<>();
 
         public BlockContext(JsonObject normalizedJson) {
             this.json = normalizedJson;
-            for (Map.Entry<String, JsonElement> entry : normalizedJson.entrySet()) {
-                String key = entry.getKey().toLowerCase();
-                if (allowedBlockTypes.contains(key)) {
-                    JsonObject categoryObject = entry.getValue().getAsJsonObject();
-                    JsonArray blockArray = categoryObject.getAsJsonArray("blocks");
-
-                    if (key.equalsIgnoreCase("door")) {
-                        JsonElement doorRadius = categoryObject.get("radius");
-                        if (doorRadius != null) {
-                            defaultDoorwayRadius = doorRadius.getAsInt();
-                        }
-                    }
-                    if (blockArray != null) {
-                        List<WeightedBlock> weightedBlocks = new ArrayList<>();
-                        int totalWeight = 0;
-                        if (!blockArray.isEmpty()) {
-                            for (int i = 0; i < blockArray.size(); i++) {
-                                JsonObject blockObject = blockArray.get(i).getAsJsonObject();
-                                String name = blockObject.get("block").getAsString();
-                                Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(name));
-                                if (block != null) {
-                                    int weight = blockObject.has("weight") ? blockObject.get("weight").getAsInt() : 1;
-                                    totalWeight += weight;
-                                    weightedBlocks.add(new WeightedBlock(block, weight, blockObject, BlockType.valueOf(entry.getKey().toUpperCase())));
-                                } else {
-                                    DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
-                                }
-                            }
-                        }
-
-                        int randomWeight = totalWeight > 0 ? new Random().nextInt(totalWeight) : 0;
-                        WeightedBlock selectedBlock = null;
-                        for (WeightedBlock weightedBlock : weightedBlocks) {
-                            randomWeight -= weightedBlock.weight;
-                            if (randomWeight < 0) {
-                                selectedBlock = weightedBlock;
-                                break;
-                            }
-                        }
-
-                        if (selectedBlock != null) {
-                            JsonObject blockObject = selectedBlock.blockObject;
-                            WeightedBlock finalSelectedBlock = selectedBlock;
-                            var blockType = finalSelectedBlock.blockType;
-                            if (key.equalsIgnoreCase(blockType.name())) {
-                                DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.block + "' for [" + key + "] list.");
-                                Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
-                                    var keywordString = keyword.name().toLowerCase();
-                                    if (blockObject.getAsJsonObject(keywordString) != null) {
-                                        JsonObject keywordObject = blockObject.getAsJsonObject(keyword.name().toLowerCase());
-                                        switch (keywordString) {
-                                            case "predicate":
-                                                DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as predicate: " + blockType);
-                                                predicates.put(blockType, normalizeJson(keywordObject));
-                                                break;
-                                            case "function":
-                                                DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as function: " + blockType);
-                                                functions.put(blockType, normalizeJson(keywordObject));
-                                                break;
-                                        }
-                                    }
-                                });
-                                switch (blockType) {
-                                    case ROOF -> {
-                                        roofBlock = finalSelectedBlock;
-                                    }
-                                    case WALLS -> {
-                                        wallBlock = finalSelectedBlock;
-                                    }
-                                    case FLOOR -> {
-                                        floorBlock = finalSelectedBlock;
-                                    }
-                                    case FILLER -> {
-                                        fillerBlock = finalSelectedBlock;
-                                    }
-                                    case DOOR -> {
-                                        doorwayBlock = finalSelectedBlock;
-                                    }
-                                    case CENTER -> {
-                                        centerBlock = finalSelectedBlock;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-        public WeightedBlock getWallBlock() {
-            return wallBlock;
-        }
-
-        public void setWallBlock(WeightedBlock wallBlock) {
-            this.wallBlock = wallBlock;
-        }
-
-        public WeightedBlock getRoofBlock() {
-            return roofBlock;
-        }
-
-        public void setRoofBlock(WeightedBlock roofBlock) {
-            this.roofBlock = roofBlock;
-        }
-
-        public WeightedBlock getFloorBlock() {
-            return floorBlock;
-        }
-
-        public void setFloorBlock(WeightedBlock floorBlock) {
-            this.floorBlock = floorBlock;
-        }
-
-        public WeightedBlock getFillerBlock() {
-            return fillerBlock;
-        }
-
-        public void setFillerBlock(WeightedBlock fillerBlock) {
-            this.fillerBlock = fillerBlock;
-        }
-
-        public WeightedBlock getDoorwayBlock() {
-            return doorwayBlock;
-        }
-
-        public void setDoorwayBlock(WeightedBlock doorwayBlock) {
-            this.doorwayBlock = doorwayBlock;
-        }
-
-        public WeightedBlock getCenterBlock() {
-            return centerBlock;
-        }
-
-        public void setCenterBlock(WeightedBlock centerBlock) {
-            this.centerBlock = centerBlock;
+            BlockInterpreter.interpretBlockContext(normalizedJson, this);
         }
 
         public Map<BlockType, JsonObject> getFunctions() {
@@ -257,6 +123,7 @@ public class ContextUtils {
 
         private BlockPos startPos;
         private BlockContext blockContext;
+        public JsonObject normalizedJson;
 
         public StructureContext(String structureName, float ladderRoomChance, int roomCount, int height, int width, int length, boolean generatesSpawners, int maxSpawners, int maxSpawnersPerRoom, List<EntityType<?>> potentialSpawns, int sizeThreshold) {
             this.maxSpawnersPerRoom = maxSpawnersPerRoom;
@@ -275,7 +142,6 @@ public class ContextUtils {
 
         public static StructureContext fromJson(JsonObject json, String jsonFilePath) {
             JsonObject normalizedJson = normalizeJson(json);
-            var blockContext = new BlockContext(normalizedJson);
 
             String structureName = normalizedJson.has("name") ? normalizedJson.get("name").getAsString() :
                     DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureLoader.STRUCTURE_DIR);
@@ -327,7 +193,7 @@ public class ContextUtils {
                     spawnerEntities,
                     sizeThreshold
             );
-            structure.setBlockContext(blockContext);
+            structure.normalizedJson = normalizedJson;
             return structure;
         }
 
