@@ -56,7 +56,6 @@ public class Dungeon {
     public ContextUtils.WeightedBlock centerBlockW;
     public ContextUtils.WeightedBlock doorwayBlockW;
     public ContextUtils.WeightedBlock fillerBlockW;
-    public BlockPos currentPosition;
     public int maxSpawners;
     public int maxSpawnersPerRoom;
     public int currentSpawners;
@@ -68,12 +67,6 @@ public class Dungeon {
     public int height;
     public int roomCount;
     public float ladderRoomChance;
-    public RandomSource random;
-    public Direction startDirection;
-    public BlockPos startPos;
-    public Set<BlockPos> previousRoomWalls;
-    public BlockPos currentPos;
-    public Direction currentDirection;
     public int width;
     public int length;
 
@@ -124,29 +117,26 @@ public class Dungeon {
         centerBlock = blockContext.centerBlock.block;
     }
 
-    public int getRandomSize() {
+    public int getRandomSize(RandomSource random) {
         int variation = (int) (baseWidth * (sizeThreshold / 100.0));
         return baseWidth + random.nextInt(variation * 2 + 1) - variation;
     }
 
-    public BlockPos getCurrentPosition() {
-        return currentPosition;
-    }
 
-    public void setCurrentPosition(BlockPos currentPosition) {
-        this.currentPosition = currentPosition;
+    public RandomSource getRandom() {
+        return level.random;
     }
 
 
-    private void placeSpawners() {
+    private void placeSpawners(BlockPos pos, RandomSource random) {
         if (currentSpawners >= maxSpawners) {
             return;
         }
 
         for (int i = 0; i < maxSpawnersPerRoom; i++) {
-            int x = currentPos.getX() + random.nextInt(width);
-            int y = currentPos.getY() + random.nextInt(height);
-            int z = currentPos.getZ() + random.nextInt(length);
+            int x = pos.getX() + random.nextInt(width);
+            int y = pos.getY() + random.nextInt(height);
+            int z = pos.getZ() + random.nextInt(length);
             BlockPos spawnerPos = new BlockPos(x, y, z);
             EntityType<?> entityType = potentialSpawns.get(random.nextInt(potentialSpawns.size()));
             setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3, BlockType.CENTER);
@@ -183,11 +173,12 @@ public class Dungeon {
         }
     }
 
+    public void generateLadderRoom(BlockPos basePos, Direction currentDirection, Set<BlockPos> overlapWalls) {
+        Set<BlockPos> roomWalls = generateRoom(basePos, overlapWalls, true);
 
-    public void generateLadderRoom() {
-        previousRoomWalls = generateRoom(true);
         Direction ladderFacing = Direction.EAST;
-        BlockPos ladderBase = currentPos.offset(width / 2 - 1, 1, length / 2 - 1);
+        BlockPos ladderBase = basePos.offset(width / 2 - 1, 1, length / 2 - 1);
+
         for (int i = 0; i < height; i++) {
             BlockPos ladderPos = ladderBase.above(i);
             BlockState ladderState = Blocks.LADDER.defaultBlockState()
@@ -195,10 +186,16 @@ public class Dungeon {
                     .setValue(LadderBlock.WATERLOGGED, false);
             setBlock(ladderPos, ladderState, 3, BlockType.CENTER);
         }
-        currentPos = currentPos.above(height);
+
+        BlockPos topRoomPos = basePos.above(height);
+        Set<BlockPos> upperRoomWalls = generateRoom(topRoomPos, roomWalls, false);
+
         BlockPos opening = ladderBase.above(height);
         setBlock(opening, Blocks.AIR.defaultBlockState(), 3, BlockType.CENTER);
+        placeDoorway(basePos, currentDirection, level.random);
+
     }
+
 
     /*private Set<BlockPos> generateRoom(ServerLevel world, BlockPos pos, int width, int length, int height, Block floorBlock, Block wallBlock, Block roofBlock, Set<BlockPos> overlapWalls, boolean isBottomRoom) {
         Set<BlockPos> wallPositions = new HashSet<>();
@@ -215,23 +212,26 @@ public class Dungeon {
     public Set<BlockPos> roofPositions;
     public Set<BlockPos> wallPositions;
 
-    private Set<BlockPos> generateRoom(boolean isBottomRoom) {
-        wallPositions = new HashSet<>();
-        roofPositions = isBottomRoom ? null : generateRoof();
-        generateWalls();
-        generateFloor();
-        fillRoomInteriorWithAir();
-        placeDoorway();
+    private Set<BlockPos> generateRoom(BlockPos pos, Set<BlockPos> overlapWalls, boolean isBottomRoom) {
+        Set<BlockPos> wallPositions = new HashSet<>();
+        Set<BlockPos> roofPositions = isBottomRoom ? null : generateRoof(pos);
+
+        generateWalls(pos, wallPositions, overlapWalls, roofPositions);
+        generateFloor(pos, wallPositions);
+
+        fillRoomInteriorWithAir(pos, wallPositions);
+
         return wallPositions;
     }
 
-    private void fillRoomInteriorWithAir() {
+
+    private void fillRoomInteriorWithAir(BlockPos pos, Set<BlockPos> wallPositions) {
         for (int x = 1; x < width - 1; x++) {
             for (int z = 1; z < length - 1; z++) {
                 for (int y = 1; y <= height; y++) {
-                    BlockPos blockPos = currentPos.offset(x, y, z);
+                    BlockPos blockPos = pos.offset(x, y, z);
                     if (!wallPositions.contains(blockPos)) {
-                        setBlock(blockPos, fillerBlockW, 3);
+                        setBlock(blockPos, fillerBlock.defaultBlockState(), 3, BlockType.FILLER);
                     }
                 }
             }
@@ -239,37 +239,37 @@ public class Dungeon {
     }
 
 
-    private void generateFloor() {
+    private void generateFloor(BlockPos pos, Set<BlockPos> wallPositions) {
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
-                BlockPos floorPos = currentPos.offset(x, 0, z);
+                BlockPos floorPos = pos.offset(x, 0, z);
                 if (level.getBlockState(floorPos).getBlock() instanceof LadderBlock) {
                     setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3, BlockType.FLOOR);
                 } else if (!wallPositions.contains(floorPos)) {
-                    setBlock(floorPos, floorBlockW, 3);
+                    setBlock(floorPos, floorBlock.defaultBlockState(), 3, BlockType.FLOOR);
                 }
             }
         }
     }
 
-    private void generateWalls() {
+    private void generateWalls(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, Set<BlockPos> roofPositions) {
         for (int y = 1; y <= height + 1; y++) {
             for (int x = 0; x < width; x++) {
-                BlockPos wallPos1 = currentPos.offset(x, y, 0);
-                BlockPos wallPos2 = currentPos.offset(x, y, length - 1);
-                addWallBlock(wallPos1);
-                addWallBlock(wallPos2);
+                BlockPos wallPos1 = pos.offset(x, y, 0);
+                BlockPos wallPos2 = pos.offset(x, y, length - 1);
+                addWallBlock(wallPos1, wallPositions, overlapWalls, roofPositions);
+                addWallBlock(wallPos2, wallPositions, overlapWalls, roofPositions);
             }
             for (int z = 1; z < length - 1; z++) {
-                BlockPos wallPos1 = currentPos.offset(0, y, z);
-                BlockPos wallPos2 = currentPos.offset(width - 1, y, z);
-                addWallBlock(wallPos1);
-                addWallBlock(wallPos2);
+                BlockPos wallPos1 = pos.offset(0, y, z);
+                BlockPos wallPos2 = pos.offset(width - 1, y, z);
+                addWallBlock(wallPos1, wallPositions, overlapWalls, roofPositions);
+                addWallBlock(wallPos2, wallPositions, overlapWalls, roofPositions);
             }
         }
     }
 
-    private void addWallBlock(BlockPos pos) {
+    private void addWallBlock(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, Set<BlockPos> roofPositions) {
         BlockState currentState = level.getBlockState(pos);
         Block currentBlock = currentState.getBlock();
 
@@ -281,16 +281,16 @@ public class Dungeon {
                                 roofBlock.equals(currentBlock));
 
         if (canReplaceBlock) {
-            setBlock(pos, wallBlockW, 3);
+            setBlock(pos, wallBlock.defaultBlockState(), 3, BlockType.WALLS);
             wallPositions.add(pos);
             return;
         }
 
-        if (previousRoomWalls != null && previousRoomWalls.contains(pos)) {
-            if (isSharedWall(pos, previousRoomWalls)) {
+        if (overlapWalls != null && overlapWalls.contains(pos)) {
+            if (isSharedWall(pos, overlapWalls)) {
                 setBlock(pos, Blocks.AIR.defaultBlockState(), 3, BlockType.WALLS);
             } else {
-                setBlock(pos, wallBlockW, 3);
+                setBlock(pos, wallBlock.defaultBlockState(), 3, BlockType.WALLS);
                 wallPositions.add(pos);
             }
             return;
@@ -322,16 +322,17 @@ public class Dungeon {
     }*/
 
 
-    private Set<BlockPos> generateRoof() {
+    private Set<BlockPos> generateRoof(BlockPos pos) {
         Set<BlockPos> roofPositions = new HashSet<>();
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
-                BlockPos roofPos = currentPos.offset(x, height + 1, z);
+                BlockPos roofPos = pos.offset(x, height + 1, z);
                 if (level.getBlockState(roofPos).getBlock() instanceof LiquidBlock ||
                         level.getBlockState(roofPos).isAir() ||
                         level.getBlockState(roofPos).is(Blocks.CAVE_AIR) ||
                         wallBlock.equals(level.getBlockState(roofPos).getBlock())) {
-                    setBlock(roofPos, roofBlockW, 3);
+
+                    setBlock(roofPos, roofBlock.defaultBlockState(), 3, BlockType.ROOF);
                     roofPositions.add(roofPos);
                 }
             }
@@ -345,22 +346,22 @@ public class Dungeon {
                 (overlapWalls.contains(pos.east()) && overlapWalls.contains(pos.west()));
     }
 
-    private void placeDoorway() {
-        placeSingleDoor(currentDirection);
-        placeSingleDoor(currentDirection.getOpposite());
-        placeSingleDoor(Direction.EAST);
-        placeSingleDoor(Direction.WEST);
+    private void placeDoorway(BlockPos pos, Direction direction, RandomSource random) {
+        placeSingleDoor(pos, direction, random);
+        placeSingleDoor(pos, direction.getOpposite(), random);
+        placeSingleDoor(pos, Direction.EAST, random);
+        placeSingleDoor(pos, Direction.WEST, random);
     }
 
-    private void placeSingleDoor(Direction direction) {
+    private void placeSingleDoor(BlockPos pos, Direction direction, RandomSource random) {
         int offset = random.nextInt(3) - 1;
 
-        BlockPos doorPosBottom1;
+        BlockPos doorPosBottom1 = pos;
         BlockPos outwardPos;
         switch (direction) {
             case NORTH, SOUTH -> {
                 int doorX = (width / 2) + offset;
-                doorPosBottom1 = currentPos.offset(doorX, 1, direction == Direction.NORTH ? 0 : length - 1);
+                doorPosBottom1 = pos.offset(doorX, 1, direction == Direction.NORTH ? 0 : length - 1);
                 outwardPos = doorPosBottom1.relative(direction == Direction.NORTH ? Direction.NORTH : Direction.SOUTH);
                 for (int i = -defaultDoorwayRadius; i <= defaultDoorwayRadius; i++) {
                     for (int j = -defaultDoorwayRadius; j <= defaultDoorwayRadius; j++) {
@@ -370,17 +371,17 @@ public class Dungeon {
                             return;
                         }
                         if (!level.getBlockState(doorPos).is(Blocks.LADDER)) {
-                            setBlock(doorPos, doorwayBlockW, 3);
+                            setBlock(doorPos, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
                         }
                         if (!level.getBlockState(doorPosTop).is(Blocks.LADDER)) {
-                            setBlock(doorPosTop, doorwayBlockW, 3);
+                            setBlock(doorPosTop, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
                         }
                     }
                 }
             }
             case EAST, WEST -> {
                 int doorZ = (length / 2) + offset;
-                doorPosBottom1 = currentPos.offset(direction == Direction.WEST ? 0 : width - 1, 1, doorZ);
+                doorPosBottom1 = pos.offset(direction == Direction.WEST ? 0 : width - 1, 1, doorZ);
                 outwardPos = doorPosBottom1.relative(direction == Direction.WEST ? Direction.WEST : Direction.EAST);
                 for (int i = -defaultDoorwayRadius; i <= defaultDoorwayRadius; i++) {
                     BlockPos doorPos = doorPosBottom1.offset(0, 0, i);
@@ -388,8 +389,8 @@ public class Dungeon {
                     if (roofBlock.equals(level.getBlockState(outwardPos).getBlock())) {
                         return;
                     }
-                    setBlock(doorPos, doorwayBlockW, 3);
-                    setBlock(doorPosTop, doorwayBlockW, 3);
+                    setBlock(doorPos, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
+                    setBlock(doorPosTop, doorwayBlock.defaultBlockState(), 3, BlockType.DOOR);
                 }
             }
             default -> {
@@ -399,13 +400,13 @@ public class Dungeon {
         }
     }
 
-    private BlockPos calculateNextRoomPos() {
-        return switch (currentDirection) {
-            case NORTH -> currentPos.offset(0, 0, -length + 1);
-            case SOUTH -> currentPos.offset(0, 0, length - 1);
-            case WEST -> currentPos.offset(-width + 1, 0, 0);
-            case EAST -> currentPos.offset(width - 1, 0, 0);
-            default -> throw new IllegalStateException("Unexpected value: " + currentDirection);
+    private BlockPos calculateNextRoomPos(BlockPos pos, Direction direction) {
+        return switch (direction) {
+            case NORTH -> pos.offset(0, 0, -length + 1);
+            case SOUTH -> pos.offset(0, 0, length - 1);
+            case WEST -> pos.offset(-width + 1, 0, 0);
+            case EAST -> pos.offset(width - 1, 0, 0);
+            default -> throw new IllegalStateException("Unexpected value: " + direction);
         };
     }
 
@@ -425,8 +426,6 @@ public class Dungeon {
     public BlockPos upperRoomPos;
 
     public void generateDungeon() {
-        startPos = structureContext.getStartPos();
-        startDirection = structureContext.getStartDirection();
         ladderRoomChance = structureContext.getLadderRoomChance();
         roomCount = structureContext.getRoomCount();
         height = structureContext.getHeight();
@@ -437,29 +436,36 @@ public class Dungeon {
         maxSpawners = structureContext.getMaxSpawners();
         maxSpawnersPerRoom = structureContext.getMaxSpawnersPerRoom();
         potentialSpawns = structureContext.getPotentialSpawns();
-        previousRoomWalls = null;
-        currentPos = startPos;
-        currentDirection = startDirection;
+        Set<BlockPos> previousRoomWalls = null;
+        var startPos = structureContext.getStartPos();
+        var startDirection = structureContext.getStartDirection();
+        var currentPos = startPos;
+        var currentDirection = startDirection;
+        var random = level.random;
         for (int i = 0; i < roomCount; i++) {
-            random = level.getRandom();
-            width = getRandomSize();
-            length = getRandomSize();
+            width = getRandomSize(random);
+            length = getRandomSize(random);
             boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
 
+
             if (isLadderRoom) {
-                generateLadderRoom();
-                upperRoomPos = currentPos.above(height);
+                generateLadderRoom(currentPos, currentDirection, previousRoomWalls);
+                placeDoorway(currentPos, currentDirection, random);
+                BlockPos upperRoomPos = currentPos.above(height);
+                placeDoorway(upperRoomPos, currentDirection, random);
                 if (generatesSpawners) {
-                    placeSpawners();
-                    placeSpawners();
+                    placeSpawners(currentPos, random);
+                    placeSpawners(upperRoomPos, random);
                 }
-                currentPos = calculateNextRoomPos();
+                currentPos = calculateNextRoomPos(upperRoomPos, currentDirection);
             } else {
-                previousRoomWalls = generateRoom(false);
+                Set<BlockPos> currentRoomWalls = generateRoom(currentPos, previousRoomWalls, false);
+                previousRoomWalls = currentRoomWalls;
+                placeDoorway(currentPos, currentDirection, random);
                 if (generatesSpawners) {
-                    placeSpawners();
+                    placeSpawners(currentPos, random);
                 }
-                currentPos = calculateNextRoomPos();
+                currentPos = calculateNextRoomPos(currentPos, currentDirection);
             }
 
             currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
