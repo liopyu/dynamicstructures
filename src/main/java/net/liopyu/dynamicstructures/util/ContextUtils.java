@@ -7,6 +7,7 @@ import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.data.enums.KeyWordType;
+import net.liopyu.dynamicstructures.data.enums.StructureType;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -51,9 +52,11 @@ public class ContextUtils {
         private Map<BlockType, JsonObject> functions = new HashMap<>();
         public List<WeightedBlock> weightedBlocks = new ArrayList<>();
 
-        public BlockContext(JsonObject normalizedJson) {
-            this.json = normalizedJson;
-            BlockInterpreter.interpretBlockContext(normalizedJson, this);
+        public BlockContext(StructureContext context) {
+            this.json = context.normalizedJson;
+            BlockInterpreter.interpretBlockContext(context.normalizedJson, this);
+            context.setBlockContext(this);
+            this.setLevel(context.level);
         }
 
         public Map<BlockType, JsonObject> getFunctions() {
@@ -120,10 +123,11 @@ public class ContextUtils {
         private final int maxSpawners;
         private final int sizeThreshold;
         private final List<EntityType<?>> potentialSpawns;
-
+        public ServerLevel level;
         private BlockPos startPos;
         private BlockContext blockContext;
         public JsonObject normalizedJson;
+        public StructureType structureType;
 
         public StructureContext(String structureName, float ladderRoomChance, int roomCount, int height, int width, int length, boolean generatesSpawners, int maxSpawners, int maxSpawnersPerRoom, List<EntityType<?>> potentialSpawns, int sizeThreshold) {
             this.maxSpawnersPerRoom = maxSpawnersPerRoom;

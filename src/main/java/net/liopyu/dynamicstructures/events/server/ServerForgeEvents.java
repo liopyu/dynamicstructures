@@ -231,7 +231,6 @@ public class ServerForgeEvents {
      * @param pos              The world position being evaluated for structure placement.
      * @return {@code true} if the structure should be generated in the chunk; {@code false} otherwise.
      * @see #getMaxSize(int, int)
-     * @see Dungeon#getRandomSize(int, net.minecraft.util.RandomSource, int)
      */
     public static boolean shouldGenerateStructure(ContextUtils.StructureContext structureContext, ContextUtils.SpawnContext spawnContext, ChunkPos chunkPos, ServerLevel level, BlockPos pos) {
         int width = getMaxSize(structureContext.getWidth(), structureContext.getSizeThreshold()) + 5;
@@ -396,7 +395,7 @@ public class ServerForgeEvents {
         PlaceStructureCommand.register(dispatcher);
         DefaultStructureCommand.register(dispatcher);
 
-        // My dev commands
+        // Dev commands
         if (!FMLEnvironment.production)
             NewStructureCommand.register(dispatcher);
     }
