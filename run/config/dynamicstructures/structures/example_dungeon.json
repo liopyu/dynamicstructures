@@ -1,4 +1,5 @@
 {
+  "type": "dungeon",
   "name": "example_dungeon",
   "ladder_chance": 10,
   "rooms": 15,

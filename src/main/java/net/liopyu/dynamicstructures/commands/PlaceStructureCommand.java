@@ -8,6 +8,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.liopyu.dynamicstructures.DynamicStructures;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.structures.Dungeon;
+import net.liopyu.dynamicstructures.structures.Tower;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.ChatFormatting;
@@ -95,7 +96,19 @@ public class PlaceStructureCommand {
     private static void placeStructureAt(ContextUtils.StructureContext structureContext, ServerLevel level, BlockPos pos) {
         if (shouldGenerateStructure(structureContext, level, pos)) {
             structureContext.setStartPos(pos);
-            new Dungeon(structureContext, level).generateDungeon();
+
+            switch (structureContext.getStructureType()) {
+                case DUNGEON -> {
+                    new Dungeon(structureContext, level).generateDungeon();
+                }
+                case TOWER -> {
+                    new Tower(structureContext, level).generateTower();
+                }
+                default -> {
+                    DSHelperClass.logErrorMessage("Unknown structure type: " + structureContext.getStructureType());
+                }
+            }
         }
     }
+
 }

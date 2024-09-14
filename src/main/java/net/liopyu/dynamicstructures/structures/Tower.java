@@ -45,8 +45,8 @@ public class Tower {
         this.length = structureContext.getLength(); // Length of the tower
     }
 
-    public void generateTower(BlockPos basePos) {
-        BlockPos currentPos = basePos;
+    public void generateTower() {
+        BlockPos currentPos = structureContext.getStartPos();
         Set<BlockPos> wallPositions = new HashSet<>();
 
         for (int i = 0; i < floorCount; i++) {

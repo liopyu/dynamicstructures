@@ -102,14 +102,15 @@ public class ContextUtils {
      */
     public static class StructureContext {
         public static final List<EntityType<?>> DEFAULT_SPAWNER_ENTITIES = List.of(EntityType.ZOMBIE, EntityType.CREEPER);
-        private static final float DEFAULT_LADDER_CHANCE = 10.0f;
-        private static final int DEFAULT_ROOM_COUNT = 15;
-        private static final int DEFAULT_HEIGHT = 8;
-        private static final int DEFAULT_WIDTH = 8;
-        private static final int DEFAULT_LENGTH = 8;
-        private static final int DEFAULT_SIZE_THRESHOLD = 30;
-        private static final int DEFAULT_MAX_SPAWNERS_PER_ROOM = 1;
-        private static final int DEFAULT_MAX_SPAWNERS = 10;
+        public static final float DEFAULT_LADDER_CHANCE = 10.0f;
+        public static final int DEFAULT_ROOM_COUNT = 15;
+        public static final int DEFAULT_HEIGHT = 8;
+        public static final int DEFAULT_WIDTH = 8;
+        public static final int DEFAULT_LENGTH = 8;
+        public static final int DEFAULT_SIZE_THRESHOLD = 30;
+        public static final int DEFAULT_MAX_SPAWNERS_PER_ROOM = 1;
+        public static final int DEFAULT_MAX_SPAWNERS = 10;
+        public static final String DEFAULT_STRUCTURE_TYPE = "dungeon";
 
         private final int maxSpawnersPerRoom;
         private final Direction startDirection;
@@ -144,63 +145,13 @@ public class ContextUtils {
             this.potentialSpawns = potentialSpawns;
         }
 
-        public static StructureContext fromJson(JsonObject json, String jsonFilePath) {
-            JsonObject normalizedJson = normalizeJson(json);
-
-            String structureName = normalizedJson.has("name") ? normalizedJson.get("name").getAsString() :
-                    DSHelperClass.deriveStructureNameFromPath(jsonFilePath, StructureLoader.STRUCTURE_DIR);
-            if (!normalizedJson.has("name")) {
-                DSHelperClass.logWarningMessageOnce("'name' is missing or null in [" + jsonFilePath + "]. Defaulting to '" + structureName + "'.");
-            }
-            float ladderChance = normalizedJson.has("ladder_chance") ? normalizedJson.get("ladder_chance").getAsFloat() : DSHelperClass.logDefault("'ladder_chance'", DEFAULT_LADDER_CHANCE, jsonFilePath);
-            int roomCount = normalizedJson.has("rooms") ? normalizedJson.get("rooms").getAsInt() : DSHelperClass.logDefault("'rooms'", DEFAULT_ROOM_COUNT, jsonFilePath);
-            int height = normalizedJson.has("height") ? normalizedJson.get("height").getAsInt() : DSHelperClass.logDefault("'height'", DEFAULT_HEIGHT, jsonFilePath);
-            int width = normalizedJson.has("width") ? normalizedJson.get("width").getAsInt() : DSHelperClass.logDefault("'width'", DEFAULT_WIDTH, jsonFilePath);
-            int length = normalizedJson.has("length") ? normalizedJson.get("length").getAsInt() : DSHelperClass.logDefault("'length'", DEFAULT_LENGTH, jsonFilePath);
-            int sizeThreshold = normalizedJson.has("size_threshold") ? normalizedJson.get("size_threshold").getAsInt() : DSHelperClass.logDefault("'size_threshold'", DEFAULT_SIZE_THRESHOLD, jsonFilePath);
-
-            boolean generateSpawners = false;
-            int maxSpawners = DEFAULT_MAX_SPAWNERS;
-            int maxSpawnersPerRoom = DEFAULT_MAX_SPAWNERS_PER_ROOM;
-            List<EntityType<?>> spawnerEntities = DEFAULT_SPAWNER_ENTITIES;
-
-            if (normalizedJson.has("spawners")) {
-                JsonObject spawnersObject = normalizedJson.getAsJsonObject("spawners");
-
-                maxSpawners = spawnersObject.has("max") ? spawnersObject.get("max").getAsInt() : DSHelperClass.logDefault("'max'", DEFAULT_MAX_SPAWNERS, jsonFilePath);
-                maxSpawnersPerRoom = spawnersObject.has("room_count") ? spawnersObject.get("room_count").getAsInt() : DSHelperClass.logDefault("'room_count'", DEFAULT_MAX_SPAWNERS_PER_ROOM, jsonFilePath);
-
-                if (spawnersObject.has("mobs")) {
-                    spawnerEntities = new ArrayList<>();
-                    JsonArray mobsArray = spawnersObject.getAsJsonArray("mobs");
-                    for (JsonElement element : mobsArray) {
-                        String entityName = element.getAsString();
-                        EntityType.byString(entityName).ifPresent(spawnerEntities::add);
-                    }
-                } else {
-                    DSHelperClass.logWarningMessageOnce("'mobs' are missing or null in " + jsonFilePath + ". Defaulting to " + DEFAULT_SPAWNER_ENTITIES + ".");
-                }
-
-                generateSpawners = true;
-            }
-
-            var structure = new StructureContext(
-                    structureName,
-                    ladderChance,
-                    roomCount,
-                    height,
-                    width,
-                    length,
-                    generateSpawners,
-                    maxSpawners,
-                    maxSpawnersPerRoom,
-                    spawnerEntities,
-                    sizeThreshold
-            );
-            structure.normalizedJson = normalizedJson;
-            return structure;
+        public StructureType getStructureType() {
+            return structureType;
         }
 
+        public void setStructureType(StructureType structureType) {
+            this.structureType = structureType;
+        }
 
         public int getMaxSpawnersPerRoom() {
             return maxSpawnersPerRoom;

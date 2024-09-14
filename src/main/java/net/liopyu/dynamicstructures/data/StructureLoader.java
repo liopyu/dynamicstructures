@@ -4,6 +4,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.liopyu.dynamicstructures.Config;
+import net.liopyu.dynamicstructures.data.enums.StructureType;
+import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.server.level.ServerLevel;
@@ -39,7 +41,7 @@ import java.util.Map;
  * </ul>
  */
 public class StructureLoader {
-    public static final File STRUCTURE_DIR = new File("config/dynamicstructures/structures/");
+    public static final File STRUCTURE_DIR = new File(Config.structure_directory);
     private static final File DEFAULT_STRUCTURE_FILE = new File(STRUCTURE_DIR, "example_dungeon.json");
     public static Map<String, ContextUtils.StructureContext> cachedStructures = new HashMap<>();
     private static boolean structuresLoaded = false;
@@ -100,7 +102,7 @@ public class StructureLoader {
                         JsonElement jsonElement = JsonParser.parseReader(reader);
                         if (jsonElement.isJsonObject()) {
                             JsonObject jsonObject = jsonElement.getAsJsonObject();
-                            ContextUtils.StructureContext newContext = ContextUtils.StructureContext.fromJson(jsonObject, file.getAbsolutePath());
+                            ContextUtils.StructureContext newContext = BlockInterpreter.fromJson(jsonObject, file.getAbsolutePath());
                             boolean alreadyExists = structures.keySet().stream()
                                     .anyMatch(existingContext -> existingContext.equals(newContext.getStructureName()));
                             if (alreadyExists) {
@@ -117,6 +119,60 @@ public class StructureLoader {
         }
     }
 
+   /* private static void loadJsonFilesRecursively(File directory, Map<String, ContextUtils.StructureContext> structures) {
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    loadJsonFilesRecursively(file, structures);
+                } else if (file.isFile() && file.getName().endsWith(".json")) {
+                    try (FileReader reader = new FileReader(file)) {
+                        JsonElement jsonElement = JsonParser.parseReader(reader);
+                        if (jsonElement.isJsonObject()) {
+                            JsonObject jsonObject = jsonElement.getAsJsonObject();
+
+                            StructureType structureType = determineStructureType(directory);
+
+                            ContextUtils.StructureContext newContext = BlockInterpreter.fromJson(jsonObject, file.getAbsolutePath());
+
+                            newContext.setStructureType(structureType);
+
+                            boolean alreadyExists = structures.containsKey(newContext.getStructureName());
+                            if (alreadyExists) {
+                                DSHelperClass.logErrorMessage("Structure '" + newContext.getStructureName() + "' is already registered. Skipping duplicate entry in file: " + file.getAbsolutePath());
+                            } else {
+                                structures.put(newContext.getStructureName(), newContext);
+                            }
+                        }
+                    } catch (IOException e) {
+                        DSHelperClass.logErrorMessageOnceCatchable("Error loading structure file: " + file.getAbsolutePath(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    private static StructureType determineStructureType(File file) {
+        // Get the absolute path and split it into components
+        String path = file.getAbsolutePath().replace("\\", "/"); // Normalize to forward slashes
+        String[] parts = path.split("/");
+
+        // Find the "structures" directory in the path
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].equalsIgnoreCase("structures") && i + 1 < parts.length) {
+                // Get the next part directly after "structures/"
+                String nextFolder = parts[i + 1].toLowerCase();
+                if (nextFolder.equals("tower")) {
+                    DSHelperClass.logInfoMessageDev("adding " + nextFolder + " to Towers");
+                    return StructureType.TOWER;
+                } else if (nextFolder.equals("dungeon")) {
+                    DSHelperClass.logInfoMessageDev("adding " + nextFolder + " to Dungeons");
+                    return StructureType.DUNGEON;
+                }
+            }
+        }
+        return StructureType.DUNGEON;
+    }*/
 
     /**
      * Loads a default structure configuration if no other structures are found.
@@ -133,7 +189,7 @@ public class StructureLoader {
                 JsonElement jsonElement = JsonParser.parseReader(reader);
                 if (jsonElement.isJsonObject()) {
                     JsonObject jsonObject = jsonElement.getAsJsonObject();
-                    ContextUtils.StructureContext context = ContextUtils.StructureContext.fromJson(jsonObject, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
+                    ContextUtils.StructureContext context = BlockInterpreter.fromJson(jsonObject, DEFAULT_STRUCTURE_FILE.getAbsolutePath());
                     structures.put(context.getStructureName(), context);
                 }
             }
