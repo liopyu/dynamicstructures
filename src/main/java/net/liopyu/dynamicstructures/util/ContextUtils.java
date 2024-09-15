@@ -48,6 +48,7 @@ public class ContextUtils {
         public WeightedBlock centerBlock;
         public WeightedBlock doorwayBlock;
         public WeightedBlock fillerBlock;
+        public WeightedBlock stairBlock;
         private Map<BlockType, JsonObject> predicates = new HashMap<>();
         private Map<BlockType, JsonObject> functions = new HashMap<>();
         public List<WeightedBlock> weightedBlocks = new ArrayList<>();

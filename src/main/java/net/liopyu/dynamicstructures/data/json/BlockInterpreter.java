@@ -180,6 +180,9 @@ public class BlockInterpreter {
                                 case CENTER -> {
                                     context.centerBlock = finalSelectedBlock;
                                 }
+                                case STAIRS -> {
+                                    context.stairBlock = finalSelectedBlock;
+                                }
                             }
                         }
 
