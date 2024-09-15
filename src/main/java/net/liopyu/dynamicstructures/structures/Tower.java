@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.LadderBlock;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.HashSet;
@@ -23,7 +24,6 @@ public class Tower {
     public int width;
     public int length;
 
-    // Blocks used for the tower's construction
     public ContextUtils.WeightedBlock wallBlock;
     public ContextUtils.WeightedBlock floorBlock;
     public ContextUtils.WeightedBlock roofBlock;
@@ -53,15 +53,20 @@ public class Tower {
             generateFloor(currentPos, wallPositions);
             generateWalls(currentPos, wallPositions);
 
-            // If it's the last floor, generate the roof
             if (i == floorCount - 1) {
                 generateRoof(currentPos.above(heightPerFloor));
             } else {
-                // Move to the next floor level
                 currentPos = currentPos.above(heightPerFloor);
             }
         }
+
+        int totalHeight = floorCount * heightPerFloor;
+
+        BlockPos staircaseStartPos = structureContext.getStartPos().offset(width / 2, 1, length / 2);
+
+        generateCentralStaircase(staircaseStartPos, totalHeight, Direction.NORTH, 4);
     }
+
 
     private void generateFloor(BlockPos pos, Set<BlockPos> wallPositions) {
         for (int x = 0; x < width; x++) {
@@ -120,6 +125,40 @@ public class Tower {
             var finalBlock = BlockInterpreter.handleBlockPlacement(pPos, blockType, pNewState, getStructureContext().getBlockContext());
             this.getLevel().setBlock(pPos, finalBlock, pFlags);
         }
+    }
+
+    private void generateCentralStaircase(BlockPos startPos, int totalHeight, Direction initialDirection, int width) {
+        Direction currentDirection = initialDirection;
+        BlockPos currentPos = startPos;
+
+        int stairsBeforeTurn = width;
+        int currentHeight = 0;
+
+        while (currentHeight < totalHeight) {
+            for (int j = 0; j < stairsBeforeTurn; j++) {
+                placeStairBlock(currentPos, currentDirection);
+
+                currentPos = currentPos.relative(currentDirection).above();
+                currentHeight++;
+
+                if (currentHeight >= totalHeight) {
+                    return;
+                }
+            }
+
+            currentPos = currentPos.relative(currentDirection.getCounterClockWise()).relative(currentDirection.getOpposite());
+
+            currentDirection = currentDirection.getCounterClockWise();
+
+            placeStairBlock(currentPos, currentDirection);
+        }
+    }
+
+
+    private void placeStairBlock(BlockPos pos, Direction direction) {
+        BlockState stairState = Blocks.STONE_STAIRS.defaultBlockState()
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, direction);
+        level.setBlock(pos, stairState, 3);
     }
 
     public ContextUtils.StructureContext getStructureContext() {
