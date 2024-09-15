@@ -207,6 +207,8 @@ public class BlockInterpreter {
         int length = normalizedJson.has("length") ? normalizedJson.get("length").getAsInt() : DSHelperClass.logDefault("'length'", ContextUtils.StructureContext.DEFAULT_LENGTH, jsonFilePath);
         int sizeThreshold = normalizedJson.has("size_threshold") ? normalizedJson.get("size_threshold").getAsInt() : DSHelperClass.logDefault("'size_threshold'", ContextUtils.StructureContext.DEFAULT_SIZE_THRESHOLD, jsonFilePath);
         String type = normalizedJson.has("type") ? normalizedJson.get("type").getAsString() : DSHelperClass.logDefault("'type'", ContextUtils.StructureContext.DEFAULT_STRUCTURE_TYPE, jsonFilePath);
+        int staircaseRadius = normalizedJson.has("staircase_radius") ? normalizedJson.get("staircase_radius").getAsInt() : DSHelperClass.logDefault("'staircase_radius'", ContextUtils.StructureContext.DEFAULT_STAIRCASE_RADIUS, jsonFilePath);
+        int staircaseFactor = normalizedJson.has("staircasefactor") ? normalizedJson.get("staircasefactor").getAsInt() : DSHelperClass.logDefault("'staircasefactor'", 1, jsonFilePath);
 
         boolean generateSpawners = false;
         int maxSpawners = ContextUtils.StructureContext.DEFAULT_MAX_SPAWNERS;
@@ -248,6 +250,8 @@ public class BlockInterpreter {
         );
         structure.normalizedJson = normalizedJson;
         structure.setStructureType(StructureType.valueOf(type.toUpperCase()));
+        structure.setStaircaseRadius(staircaseRadius);
+        structure.staircaseFactor = staircaseFactor;
         return structure;
     }
 }

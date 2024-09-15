@@ -104,6 +104,7 @@ public class ContextUtils {
     public static class StructureContext {
         public static final List<EntityType<?>> DEFAULT_SPAWNER_ENTITIES = List.of(EntityType.ZOMBIE, EntityType.CREEPER);
         public static final float DEFAULT_LADDER_CHANCE = 10.0f;
+        public static final int DEFAULT_STAIRCASE_RADIUS = 3;
         public static final int DEFAULT_ROOM_COUNT = 15;
         public static final int DEFAULT_HEIGHT = 8;
         public static final int DEFAULT_WIDTH = 8;
@@ -130,6 +131,8 @@ public class ContextUtils {
         private BlockContext blockContext;
         public JsonObject normalizedJson;
         public StructureType structureType;
+        private int staircaseRadius;
+        public int staircaseFactor;
 
         public StructureContext(String structureName, float ladderRoomChance, int roomCount, int height, int width, int length, boolean generatesSpawners, int maxSpawners, int maxSpawnersPerRoom, List<EntityType<?>> potentialSpawns, int sizeThreshold) {
             this.maxSpawnersPerRoom = maxSpawnersPerRoom;
@@ -144,6 +147,10 @@ public class ContextUtils {
             this.generatesSpawners = generatesSpawners;
             this.maxSpawners = maxSpawners;
             this.potentialSpawns = potentialSpawns;
+        }
+
+        public int getStaircaseFactor() {
+            return staircaseFactor;
         }
 
         public StructureType getStructureType() {
@@ -166,6 +173,13 @@ public class ContextUtils {
             this.blockContext = blockContext;
         }
 
+        public void setStaircaseRadius(int staircaseRadius) {
+            this.staircaseRadius = staircaseRadius;
+        }
+
+        public int getStaircaseRadius() {
+            return staircaseRadius;
+        }
 
         /**
          * Gets the size threshold, which determines the percentage variation allowed in room size.

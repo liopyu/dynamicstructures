@@ -12,7 +12,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class Tower {
@@ -28,13 +30,16 @@ public class Tower {
     public ContextUtils.WeightedBlock roofBlock;
     public ContextUtils.WeightedBlock stairBlock;
     public Direction currentDirection;
+    public int staircaseRadius;
+    public int staircaseFactor;
 
     public Tower(ContextUtils.StructureContext structureContext, ServerLevel level) {
         this.structureContext = structureContext;
         this.level = level;
         this.structureContext.level = level;
         this.currentDirection = structureContext.getStartDirection();
-
+        this.staircaseRadius = structureContext.getStaircaseRadius();
+        this.staircaseFactor = structureContext.getStaircaseFactor();
         var blockContext = new ContextUtils.BlockContext(structureContext);
         this.floorBlock = blockContext.floorBlock != null ? blockContext.floorBlock : new ContextUtils.WeightedBlock(Blocks.STONE_BRICKS, 1, null, BlockType.FLOOR);
         this.wallBlock = blockContext.wallBlock != null ? blockContext.wallBlock : new ContextUtils.WeightedBlock(Blocks.STONE_BRICKS, 1, null, BlockType.WALLS);
@@ -65,9 +70,9 @@ public class Tower {
     private void generateRoom(BlockPos pos, Set<BlockPos> wallPositions, boolean isLastFloor, boolean generateStaircase, Set<BlockPos> stairPositions) {
 
         if (generateStaircase) {
-            int totalHeight = floorCount * heightPerFloor;
+            int maxHeight = heightPerFloor * floorCount;
             BlockPos staircaseStartPos = pos.offset(width / 2, 1, length / 2);
-            generateCentralStaircase(staircaseStartPos, totalHeight, stairPositions);
+            generateCentralStaircase(staircaseStartPos, maxHeight, stairPositions);
         }
         generateFloor(pos, wallPositions, stairPositions);
         generateWalls(pos, wallPositions);
@@ -151,52 +156,78 @@ public class Tower {
         }
     }
 
-    private void generateCentralStaircase(BlockPos startPos, int totalHeight, Set<BlockPos> stairPositions) {
+    private void generateCentralStaircase(BlockPos startPos, int maxHeight, Set<BlockPos> stairPositions) {
         BlockPos currentPos = startPos;
         int currentHeight = 0;
-        int columnRadius = (4 - 1) / 2;
+
+        BlockPos initialPos = startPos;
+
+        List<BlockPos> turnPoints = new ArrayList<>();
 
         while (currentHeight < heightPerFloor) {
-            placeColumn(currentPos.below(currentHeight), currentDirection, columnRadius, heightPerFloor);
-
-            for (int j = 0; j < 4; j++) {
+            for (int j = 0; j < staircaseRadius; j++) {
+                
                 placeStairBlock(currentPos, currentDirection, stairPositions);
 
                 currentPos = currentPos.relative(currentDirection).above();
                 currentHeight++;
+                if (currentHeight >= heightPerFloor) {
+                    turnPoints.add(currentPos);
+                    fillCenterWithCobblestone(initialPos, turnPoints, stairPositions);
 
-                if (currentHeight >= totalHeight) {
+                }
+                if (currentHeight >= maxHeight) {
                     return;
                 }
             }
 
             currentPos = currentPos.relative(currentDirection.getCounterClockWise()).relative(currentDirection.getOpposite());
             currentDirection = currentDirection.getCounterClockWise();
+            if (currentHeight <= heightPerFloor) {
+                turnPoints.add(currentPos);
+            }
             if (currentHeight <= heightPerFloor - 1) {
                 placeStairBlock(currentPos, currentDirection, stairPositions);
-
             }
         }
+
+        // Add the final turning point and fill the center with cobblestone
+        turnPoints.add(currentPos);
+        fillCenterWithCobblestone(initialPos, turnPoints, stairPositions);
+
     }
 
-    private void placeColumn(BlockPos basePos, Direction currentDirection, int radius, int roomHeight) {
-        for (int y = 0; y < roomHeight; y++) {
-            for (int x = -radius; x <= radius; x++) {
-                for (int z = -radius; z <= radius; z++) {
-                    BlockPos columnPos = basePos.offset(x, y, z);
+    private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions) {
+        BlockPos minPos = new BlockPos(
+                Math.min(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).min().orElse(initialPos.getX())),
+                initialPos.getY(),
+                Math.min(initialPos.getZ(), turnPoints.stream().mapToInt(BlockPos::getZ).min().orElse(initialPos.getZ()))
+        );
 
-                    placeColumnBlock(columnPos.relative(currentDirection)
-                            .relative(currentDirection.getCounterClockWise())
-                            .relative(currentDirection.getCounterClockWise()));
+        BlockPos maxPos = new BlockPos(
+                Math.max(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).max().orElse(initialPos.getX())),
+                initialPos.getY() + heightPerFloor - 1,
+                Math.max(initialPos.getZ(), turnPoints.stream().mapToInt(BlockPos::getZ).max().orElse(initialPos.getZ()))
+        );
+
+        for (int x = minPos.getX(); x <= maxPos.getX(); x++) {
+            for (int y = minPos.getY(); y <= maxPos.getY(); y++) {
+                for (int z = minPos.getZ(); z <= maxPos.getZ(); z++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    if (!level.getBlockState(pos).is(stairBlock.block) && !positions.contains(pos)) {
+                        placeBlock(pos, Blocks.COBBLESTONE, positions);
+                    }
                 }
             }
         }
     }
 
+    private void placeBlock(BlockPos pos, Block block, Set<BlockPos> positions) {
+        // Place the block in the world at the specified position
+        level.setBlock(pos, block.defaultBlockState(), 3); // '3' is a flag that updates the block and neighbors
 
-    private void placeColumnBlock(BlockPos pos) {
-        BlockState cobblestoneState = Blocks.COBBLESTONE.defaultBlockState();
-        level.setBlock(pos, cobblestoneState, 3);
+        // Add the position to the set to keep track of all the blocks that have been placed
+        positions.add(pos);
     }
 
 
