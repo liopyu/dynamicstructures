@@ -8,6 +8,7 @@ import net.liopyu.dynamicstructures.commands.PlaceStructureCommand;
 import net.liopyu.dynamicstructures.data.StructureLoader;
 import net.liopyu.dynamicstructures.data.StructureSetLoader;
 import net.liopyu.dynamicstructures.structures.Dungeon;
+import net.liopyu.dynamicstructures.structures.Tower;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.commands.CommandSourceStack;
@@ -170,8 +171,18 @@ public class ServerForgeEvents {
         Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
         for (ContextUtils.StructureContext structureContext : structures.values()) {
             if (spawnContext != null) {
-                DSHelperClass.logInfoMessageOnceDev("Spawning structure: " + chunk.getPos());
-                new Dungeon(structureContext, level).generateDungeon();
+                DSHelperClass.logInfoMessageOnceDev("Spawning structure: " + structureContext.getStructureName() + " at " + chunk.getPos());
+                switch (structureContext.getStructureType()) {
+                    case DUNGEON -> {
+                        new Dungeon(structureContext, level).generateDungeon();
+                    }
+                    case TOWER -> {
+                        new Tower(structureContext, level).generateTower();
+                    }
+                    default -> {
+                        DSHelperClass.logErrorMessage("Unknown structure type: " + structureContext.getStructureType());
+                    }
+                }
             } else {
                 DSHelperClass.logWarningMessageOnce(" Spawning Context is null: " + chunk.getPos() + " for structureContext: " + structureContext.getStructureName() + " for spawnContext: " + structureContext.getStructureName());
             }

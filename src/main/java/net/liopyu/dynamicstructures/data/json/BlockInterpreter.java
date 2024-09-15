@@ -121,7 +121,7 @@ public class BlockInterpreter {
                             if (block != null) {
                                 int weight = blockObject.has("weight") ? blockObject.get("weight").getAsInt() : 1;
                                 totalWeight += weight;
-                                DSHelperClass.logInfoMessageDev("adding weight " + blockObject);
+                                //DSHelperClass.logInfoMessageDev("adding weight " + blockObject);
                                 context.weightedBlocks.add(new ContextUtils.WeightedBlock(block, weight, blockObject, BlockType.valueOf(entry.getKey().toUpperCase())));
                             } else {
                                 DSHelperClass.logErrorMessage("Block '" + name + "' could not be found in the registry.");
@@ -144,18 +144,18 @@ public class BlockInterpreter {
                         ContextUtils.WeightedBlock finalSelectedBlock = selectedBlock;
                         var blockType = finalSelectedBlock.blockType;
                         if (key.equalsIgnoreCase(blockType.name())) {
-                            DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.block + "' for [" + key + "] list.");
+                            //DSHelperClass.logInfoMessageDev("Selected '" + finalSelectedBlock.block + "' for [" + key + "] list.");
                             Arrays.stream(KeyWordType.values()).toList().forEach(keyword -> {
                                 var keywordString = keyword.name().toLowerCase();
                                 if (blockObject.getAsJsonObject(keywordString) != null) {
                                     JsonObject keywordObject = blockObject.getAsJsonObject(keyword.name().toLowerCase());
                                     switch (keywordString) {
                                         case "predicate":
-                                            DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as predicate: " + blockType);
+                                            //DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as predicate: " + blockType);
                                             context.getPredicates().put(blockType, normalizeJson(keywordObject));
                                             break;
                                         case "function":
-                                            DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as function: " + blockType);
+                                            //DSHelperClass.logInfoMessageDev("Adding '" + keywordString + "' to [" + finalSelectedBlock.block + "] as function: " + blockType);
                                             context.getFunctions().put(blockType, normalizeJson(keywordObject));
                                             break;
                                     }
@@ -244,7 +244,6 @@ public class BlockInterpreter {
                 sizeThreshold
         );
         structure.normalizedJson = normalizedJson;
-        DSHelperClass.logInfoMessageDev("Setting dungeon type to: " + type);
         structure.setStructureType(StructureType.valueOf(type.toUpperCase()));
         return structure;
     }

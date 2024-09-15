@@ -1,9 +1,0 @@
-{
-  "name": "example_dungeon",
-    "salt": 1569933343,
-    "separation": 17,
-    "spacing": 20,
-    "y_min": -32,
-    "y_max": 0,
-    "max_distance": 35
-}
