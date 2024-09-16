@@ -3,6 +3,7 @@ package net.liopyu.dynamicstructures.structures;
 import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
 import net.liopyu.dynamicstructures.util.ContextUtils;
+import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -38,7 +39,6 @@ public class Tower {
         this.level = level;
         this.structureContext.level = level;
         this.currentDirection = structureContext.getStartDirection();
-        this.staircaseRadius = structureContext.getStaircaseRadius();
         this.staircaseFactor = structureContext.getStaircaseFactor();
         var blockContext = new ContextUtils.BlockContext(structureContext);
         this.floorBlock = blockContext.floorBlock != null ? blockContext.floorBlock : new ContextUtils.WeightedBlock(Blocks.STONE_BRICKS, 1, null, BlockType.FLOOR);
@@ -50,6 +50,12 @@ public class Tower {
         this.heightPerFloor = structureContext.getHeight();
         this.width = structureContext.getWidth();
         this.length = structureContext.getLength();
+
+        int originalRadius = structureContext.getStaircaseRadius();
+        int minRadius = Math.min(width, length);
+        int maxRadius = Math.max(minRadius / this.staircaseFactor, 1);
+        this.staircaseRadius = Math.min(originalRadius, maxRadius);
+        //DSHelperClass.logInfoMessageDev("original: " + originalRadius + "min: " + minRadius + " max: " + maxRadius + " final: " + this.staircaseRadius);
     }
 
     public void generateTower() {
@@ -62,7 +68,6 @@ public class Tower {
 
             generateRoom(currentPos, wallPositions, isLastFloor, generateStaircase, stairPositions);
 
-            // Move the position up for the next floor
             currentPos = currentPos.above(heightPerFloor);
         }
     }
@@ -159,42 +164,34 @@ public class Tower {
     private void generateCentralStaircase(BlockPos startPos, int maxHeight, Set<BlockPos> stairPositions) {
         BlockPos currentPos = startPos;
         int currentHeight = 0;
-
-        BlockPos initialPos = startPos;
-
         List<BlockPos> turnPoints = new ArrayList<>();
 
         while (currentHeight < heightPerFloor) {
             for (int j = 0; j < staircaseRadius; j++) {
-                
-                placeStairBlock(currentPos, currentDirection, stairPositions);
-
+                if (currentHeight > heightPerFloor) {
+                    turnPoints.add(currentPos);
+                    fillCenterWithCobblestone(startPos, turnPoints, stairPositions);
+                }
+                placeStairBlock(currentPos, currentDirection, stairPositions, currentHeight);
                 currentPos = currentPos.relative(currentDirection).above();
                 currentHeight++;
-                if (currentHeight >= heightPerFloor) {
-                    turnPoints.add(currentPos);
-                    fillCenterWithCobblestone(initialPos, turnPoints, stairPositions);
 
-                }
-                if (currentHeight >= maxHeight) {
+                if (currentHeight > maxHeight) {
                     return;
                 }
             }
-
-            currentPos = currentPos.relative(currentDirection.getCounterClockWise()).relative(currentDirection.getOpposite());
-            currentDirection = currentDirection.getCounterClockWise();
-            if (currentHeight <= heightPerFloor) {
+            if (currentHeight < heightPerFloor) {
                 turnPoints.add(currentPos);
             }
-            if (currentHeight <= heightPerFloor - 1) {
-                placeStairBlock(currentPos, currentDirection, stairPositions);
+            currentPos = currentPos.relative(currentDirection.getCounterClockWise()).relative(currentDirection.getOpposite());
+            currentDirection = currentDirection.getCounterClockWise();
+
+            if (currentHeight < heightPerFloor) {
+                placeStairBlock(currentPos, currentDirection, stairPositions, currentHeight);
             }
         }
-
-        // Add the final turning point and fill the center with cobblestone
         turnPoints.add(currentPos);
-        fillCenterWithCobblestone(initialPos, turnPoints, stairPositions);
-
+        fillCenterWithCobblestone(startPos, turnPoints, stairPositions);
     }
 
     private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions) {
@@ -223,22 +220,20 @@ public class Tower {
     }
 
     private void placeBlock(BlockPos pos, Block block, Set<BlockPos> positions) {
-        // Place the block in the world at the specified position
-        level.setBlock(pos, block.defaultBlockState(), 3); // '3' is a flag that updates the block and neighbors
+        level.setBlock(pos, block.defaultBlockState(), 3);
 
-        // Add the position to the set to keep track of all the blocks that have been placed
         positions.add(pos);
     }
 
 
-    private void placeStairBlock(BlockPos pos, Direction direction, Set<BlockPos> stairPositions) {
+    private void placeStairBlock(BlockPos pos, Direction direction, Set<BlockPos> stairPositions, int c) {
         BlockState stairState = stairBlock.block.defaultBlockState()
                 .setValue(BlockStateProperties.HORIZONTAL_FACING, direction);
         setBlock(pos, stairState, 3, BlockType.STAIRS);
         stairPositions.add(pos);
-        for (int x = 0; x < 3; x++) {
+        for (int x = 0; x < heightPerFloor; x++) {
             BlockPos pos2 = pos.offset(0, x + 1, 0);
-            if (!level.getBlockState(pos2).is(stairBlock.block)) {
+            if (!level.getBlockState(pos2).is(stairBlock.block) && c <= heightPerFloor) {
                 level.setBlock(pos2, Blocks.AIR.defaultBlockState(), 3);
                 stairPositions.add(pos2);
             }
