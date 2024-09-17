@@ -208,7 +208,7 @@ public class BlockInterpreter {
         int sizeThreshold = normalizedJson.has("size_threshold") ? normalizedJson.get("size_threshold").getAsInt() : DSHelperClass.logDefault("'size_threshold'", ContextUtils.StructureContext.DEFAULT_SIZE_THRESHOLD, jsonFilePath);
         String type = normalizedJson.has("type") ? normalizedJson.get("type").getAsString() : DSHelperClass.logDefault("'type'", ContextUtils.StructureContext.DEFAULT_STRUCTURE_TYPE, jsonFilePath);
         int staircaseRadius = normalizedJson.has("staircase_radius") ? normalizedJson.get("staircase_radius").getAsInt() : DSHelperClass.logDefault("'staircase_radius'", ContextUtils.StructureContext.DEFAULT_STAIRCASE_RADIUS, jsonFilePath);
-        int staircaseFactor = normalizedJson.has("staircasefactor") ? normalizedJson.get("staircasefactor").getAsInt() : DSHelperClass.logDefault("'staircasefactor'", 1, jsonFilePath);
+        int staircaseFactor = normalizedJson.has("staircase_factor") ? normalizedJson.get("staircase_factor").getAsInt() : DSHelperClass.logDefault("'staircase_factor'", 4, jsonFilePath);
 
         boolean generateSpawners = false;
         int maxSpawners = ContextUtils.StructureContext.DEFAULT_MAX_SPAWNERS;

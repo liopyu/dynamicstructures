@@ -88,12 +88,20 @@ public class Tower {
     }
 
     private void generateFloor(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> stairPositions) {
+        Set<BlockPos> floorOpening = new HashSet<>();
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < length; z++) {
                 BlockPos floorPos = pos.offset(x, 0, z);
                 if (!wallPositions.contains(floorPos) && !level.getBlockState(floorPos).is(stairBlock.block)) {
-                    if (!stairPositions.contains(floorPos)) {
-                        setBlock(floorPos, floorBlock, 3);
+                    for (int y = 0; y < 5; y++) {
+                        var openPos = floorPos.offset(0, -y, 0);
+                        if (stairPositions.contains(openPos) && level.getBlockState(openPos).is(stairBlock.block)) {
+                            floorOpening.add(floorPos);
+                        }
+                    }
+                    setBlock(floorPos, floorBlock, 3);
+                    if (floorOpening.contains(floorPos)) {
+                        setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3, BlockType.FLOOR);
                     }
                 }
             }
@@ -165,17 +173,16 @@ public class Tower {
         BlockPos currentPos = startPos;
         int currentHeight = 0;
         List<BlockPos> turnPoints = new ArrayList<>();
-
+        var direction = currentDirection;
+        var initialDirection = currentDirection;
         while (currentHeight < heightPerFloor) {
             for (int j = 0; j < staircaseRadius; j++) {
-                if (currentHeight > heightPerFloor) {
-                    turnPoints.add(currentPos);
-                    fillCenterWithCobblestone(startPos, turnPoints, stairPositions);
+                if (currentHeight < heightPerFloor) {
+                    placeStairBlock(currentPos, direction, stairPositions, currentHeight);
                 }
-                placeStairBlock(currentPos, currentDirection, stairPositions, currentHeight);
-                currentPos = currentPos.relative(currentDirection).above();
-                currentHeight++;
 
+                currentPos = currentPos.relative(direction).above();
+                currentHeight++;
                 if (currentHeight > maxHeight) {
                     return;
                 }
@@ -183,18 +190,14 @@ public class Tower {
             if (currentHeight < heightPerFloor) {
                 turnPoints.add(currentPos);
             }
-            currentPos = currentPos.relative(currentDirection.getCounterClockWise()).relative(currentDirection.getOpposite());
-            currentDirection = currentDirection.getCounterClockWise();
-
-            if (currentHeight < heightPerFloor) {
-                placeStairBlock(currentPos, currentDirection, stairPositions, currentHeight);
-            }
+            currentPos = currentPos.relative(direction.getCounterClockWise()).relative(direction.getOpposite());
+            direction = direction.getCounterClockWise();
         }
-        turnPoints.add(currentPos);
-        fillCenterWithCobblestone(startPos, turnPoints, stairPositions);
+
+        fillCenterWithCobblestone(startPos, turnPoints, stairPositions, initialDirection.getOpposite());
     }
 
-    private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions) {
+    private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions, Direction direction) {
         BlockPos minPos = new BlockPos(
                 Math.min(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).min().orElse(initialPos.getX())),
                 initialPos.getY(),
@@ -203,7 +206,7 @@ public class Tower {
 
         BlockPos maxPos = new BlockPos(
                 Math.max(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).max().orElse(initialPos.getX())),
-                initialPos.getY() + heightPerFloor - 1,
+                initialPos.getY() + heightPerFloor - 2,
                 Math.max(initialPos.getZ(), turnPoints.stream().mapToInt(BlockPos::getZ).max().orElse(initialPos.getZ()))
         );
 
@@ -215,6 +218,15 @@ public class Tower {
                         placeBlock(pos, Blocks.COBBLESTONE, positions);
                     }
                 }
+            }
+        }
+        for (int i = 0; i < 3; i++) {
+            if (i != 0) {
+                var openingPos = initialPos.relative(direction, i);
+                setBlock(openingPos, Blocks.AIR.defaultBlockState(), 3, BlockType.STAIRS);
+                setBlock(openingPos.offset(0, 1, 0), Blocks.AIR.defaultBlockState(), 3, BlockType.STAIRS);
+                setBlock(openingPos.offset(0, 2, 0), Blocks.AIR.defaultBlockState(), 3, BlockType.STAIRS);
+
             }
         }
     }
