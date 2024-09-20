@@ -13,16 +13,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class Tower {
     public final ContextUtils.StructureContext structureContext;
     public final ServerLevel level;
     public int floorCount;
-    public int heightPerFloor;
+    public int height;
     public int width;
     public int length;
 
@@ -33,6 +30,7 @@ public class Tower {
     public Direction currentDirection;
     public int staircaseRadius;
     public int staircaseFactor;
+    public List<ContextUtils.RoomContext> roomContexts = new ArrayList<>();
 
     public Tower(ContextUtils.StructureContext structureContext, ServerLevel level) {
         this.structureContext = structureContext;
@@ -47,7 +45,7 @@ public class Tower {
         this.stairBlock = blockContext.stairBlock != null ? blockContext.stairBlock : new ContextUtils.WeightedBlock(Blocks.STONE_STAIRS, 1, null, BlockType.STAIRS);
 
         this.floorCount = structureContext.getRoomCount();
-        this.heightPerFloor = structureContext.getHeight();
+        this.height = structureContext.getHeight();
         this.width = structureContext.getWidth();
         this.length = structureContext.getLength();
 
@@ -55,35 +53,56 @@ public class Tower {
         int minRadius = Math.min(width, length);
         int maxRadius = Math.max(minRadius / this.staircaseFactor, 1);
         this.staircaseRadius = Math.min(originalRadius, maxRadius);
-        //DSHelperClass.logInfoMessageDev("original: " + originalRadius + "min: " + minRadius + " max: " + maxRadius + " final: " + this.staircaseRadius);
+
+        preCalculateRooms();
+    }
+
+    public ContextUtils.RoomContext getRoomContext(int roomNumber) {
+        return roomNumber == -1 ? null : roomContexts.get(roomNumber);
+    }
+
+    public boolean isStairRoom(int roomNumber) {
+        return roomNumber != -1 && roomContexts.get(roomNumber).stairRoom;
     }
 
     public void generateTower() {
         BlockPos currentPos = structureContext.getStartPos();
         Set<BlockPos> wallPositions = new HashSet<>();
         Set<BlockPos> stairPositions = new HashSet<>();
+        Set<BlockPos> blockColumnShell = new HashSet<>();
         for (int i = 0; i < floorCount; i++) {
             boolean isLastFloor = (i == floorCount - 1);
-            boolean generateStaircase = (i % 2 == 0);
+            boolean generateStaircase = isStairRoom(i);
 
-            generateRoom(currentPos, wallPositions, isLastFloor, generateStaircase, stairPositions);
+            generateRoom(currentPos, wallPositions, isLastFloor, generateStaircase, stairPositions, i, blockColumnShell);
 
-            currentPos = currentPos.above(heightPerFloor);
+            currentPos = currentPos.above(height);
         }
     }
 
-    private void generateRoom(BlockPos pos, Set<BlockPos> wallPositions, boolean isLastFloor, boolean generateStaircase, Set<BlockPos> stairPositions) {
+
+    private void preCalculateRooms() {
+        for (int i = 0; i < floorCount; i++) {
+            boolean generateStaircase = true;//(i % 2 == 0); // Example condition
+            if (generateStaircase) {
+                roomContexts.add(new ContextUtils.RoomContext(i, false, generateStaircase, height, length, width));
+            }
+        }
+    }
+
+    private void generateRoom(BlockPos pos, Set<BlockPos> wallPositions, boolean isLastFloor, boolean generateStaircase, Set<BlockPos> stairPositions, int roomNumber, Set<BlockPos> blockColumnShell) {
 
         if (generateStaircase) {
-            int maxHeight = heightPerFloor * floorCount;
+            int maxHeight = height * floorCount;
             BlockPos staircaseStartPos = pos.offset(width / 2, 1, length / 2);
-            generateCentralStaircase(staircaseStartPos, maxHeight, stairPositions);
+
+            generateCentralStaircase(staircaseStartPos, maxHeight, stairPositions, roomNumber, blockColumnShell);
         }
         generateFloor(pos, wallPositions, stairPositions);
         generateWalls(pos, wallPositions);
 
         if (isLastFloor) {
-            generateRoof(pos.above(heightPerFloor));
+            generateRoof(pos.above(height));
         }
     }
 
@@ -110,7 +129,7 @@ public class Tower {
     }
 
     private void generateWalls(BlockPos pos, Set<BlockPos> wallPositions) {
-        for (int y = 1; y <= heightPerFloor; y++) {
+        for (int y = 1; y <= height; y++) {
             for (int x = 0; x < width; x++) {
                 BlockPos wallPos1 = pos.offset(x, y, 0);
                 BlockPos wallPos2 = pos.offset(x, y, length - 1);
@@ -169,35 +188,115 @@ public class Tower {
         }
     }
 
-    private void generateCentralStaircase(BlockPos startPos, int maxHeight, Set<BlockPos> stairPositions) {
+
+    private void generateCentralStaircase(BlockPos startPos, int maxHeight, Set<BlockPos> stairPositions, int roomNumber, Set<BlockPos> blockColumnShell) {
         BlockPos currentPos = startPos;
         int currentHeight = 0;
+        int currentFloorNumber = 0;
         List<BlockPos> turnPoints = new ArrayList<>();
         var direction = currentDirection;
         var initialDirection = currentDirection;
-        while (currentHeight < heightPerFloor) {
-            for (int j = 0; j < staircaseRadius; j++) {
-                if (currentHeight < heightPerFloor) {
-                    placeStairBlock(currentPos, direction, stairPositions, currentHeight);
-                }
+        var roomContext = getRoomContext(roomNumber);
+        var previousRoomStairs = isStairRoom(roomNumber - 1);
+        roomContext.setConnectedToBottomStairs(previousRoomStairs && roomContext.stairRoom);
+        var isConnectedToBottomStairs = roomContext.connectedToBottomStairs;
+        Set<BlockPos> openPositions = new HashSet<>();
 
+        int revisedHeightPerFloor = calculateRevisedHeight(roomNumber);
+
+
+        while (currentHeight < revisedHeightPerFloor) {
+            for (int j = 0; j < staircaseRadius; j++) {
+                if (currentHeight < revisedHeightPerFloor && !isConnectedToBottomStairs) {
+                    placeStairBlock(currentPos, direction, stairPositions, currentHeight, revisedHeightPerFloor, currentFloorNumber, roomContext, openPositions, blockColumnShell);
+                }
+                for (int x = 0; x < revisedHeightPerFloor; x++) {
+                    if (currentHeight < revisedHeightPerFloor) {
+                        BlockPos pos1 = currentPos.offset(0, x, 0);
+                        blockColumnShell.add(pos1.relative(direction.getClockWise()));
+                    }
+                    if (currentPos.getY() > startPos.getY()) {
+                        BlockPos pos2 = currentPos.offset(0, -x, 0);
+                        blockColumnShell.add(pos2.relative(direction.getClockWise()));
+                    }
+
+                }
                 currentPos = currentPos.relative(direction).above();
                 currentHeight++;
-                if (currentHeight > maxHeight) {
+
+
+                if (currentHeight > maxHeight && !isConnectedToBottomStairs) {
                     return;
                 }
             }
-            if (currentHeight < heightPerFloor) {
+
+            if (currentHeight < revisedHeightPerFloor && !isConnectedToBottomStairs) {
                 turnPoints.add(currentPos);
             }
+            for (int x = 0; x < revisedHeightPerFloor; x++) {
+
+                var newpos = currentPos.relative(direction.getClockWise()).offset(0, x, 0);
+                var newpos2 = currentPos.relative(direction.getClockWise()).offset(0, -x, 0);
+                var newpos3 = currentPos.relative(direction.getClockWise()).relative(direction.getCounterClockWise()).offset(0, x, 0);
+                var newpos4 = currentPos.relative(direction.getClockWise()).relative(direction.getCounterClockWise()).offset(0, -x, 0);
+                /*  if (currentHeight % roomContext.height != 0) {*/
+                blockColumnShell.add(newpos);
+                blockColumnShell.add(newpos2);
+                blockColumnShell.add(newpos3);
+                blockColumnShell.add(newpos4);
+                /*} else {
+                    DSHelperClass.logInfoMessageDev("roompos: " + currentPos);
+                    setBlock(newpos, Blocks.ACACIA_STAIRS.defaultBlockState(), 3, BlockType.STAIRS);
+                }*/
+
+
+            }
+
             currentPos = currentPos.relative(direction.getCounterClockWise()).relative(direction.getOpposite());
             direction = direction.getCounterClockWise();
-        }
 
-        fillCenterWithCobblestone(startPos, turnPoints, stairPositions, initialDirection.getOpposite());
+        }
+        /*if (!isConnectedToBottomStairs) {
+            fillCenterWithCobblestone(startPos, turnPoints, stairPositions, initialDirection.getOpposite(), revisedHeightPerFloor);
+        } */
+
+        for (BlockPos pos : blockColumnShell) {
+            if (!level.getBlockState(pos).is(Blocks.ACACIA_STAIRS) && !openPositions.contains(pos))
+                setBlock(pos, Blocks.BEDROCK.defaultBlockState(), 3, BlockType.STAIRS);
+        }
+        for (BlockPos pos : openPositions) {
+            setBlock(pos, Blocks.ACACIA_STAIRS.defaultBlockState(), 3, BlockType.STAIRS);
+        }
     }
 
-    private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions, Direction direction) {
+    public void createStairOpening(BlockPos initialPos, Direction direction, Set<BlockPos> openPositions) {
+        for (int i = 0; i < 3; i++) {
+            if (i != 0) {
+                var openingPos = initialPos.relative(direction, i);
+                openPositions.add(openingPos);
+                openPositions.add(openingPos.offset(0, 1, 0));
+                openPositions.add(openingPos.offset(0, 2, 0));
+            }
+        }
+    }
+
+    private int calculateRevisedHeight(int startingRoomNumber) {
+        int cumulativeHeight = 0;
+
+        for (int i = startingRoomNumber; i < roomContexts.size(); i++) {
+            var roomContext = getRoomContext(i);
+            if (roomContext.stairRoom) {
+                cumulativeHeight += roomContext.height;
+            } else {
+                break;
+            }
+        }
+
+        return cumulativeHeight;
+    }
+
+
+    private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions, Direction direction, int maxHeight) {
         BlockPos minPos = new BlockPos(
                 Math.min(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).min().orElse(initialPos.getX())),
                 initialPos.getY(),
@@ -206,7 +305,7 @@ public class Tower {
 
         BlockPos maxPos = new BlockPos(
                 Math.max(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).max().orElse(initialPos.getX())),
-                initialPos.getY() + heightPerFloor - 2,
+                initialPos.getY() + maxHeight - 2,
                 Math.max(initialPos.getZ(), turnPoints.stream().mapToInt(BlockPos::getZ).max().orElse(initialPos.getZ()))
         );
 
@@ -220,36 +319,29 @@ public class Tower {
                 }
             }
         }
-        for (int i = 0; i < 3; i++) {
-            if (i != 0) {
-                var openingPos = initialPos.relative(direction, i);
-                setBlock(openingPos, Blocks.AIR.defaultBlockState(), 3, BlockType.STAIRS);
-                setBlock(openingPos.offset(0, 1, 0), Blocks.AIR.defaultBlockState(), 3, BlockType.STAIRS);
-                setBlock(openingPos.offset(0, 2, 0), Blocks.AIR.defaultBlockState(), 3, BlockType.STAIRS);
 
-            }
-        }
     }
 
     private void placeBlock(BlockPos pos, Block block, Set<BlockPos> positions) {
         level.setBlock(pos, block.defaultBlockState(), 3);
-
         positions.add(pos);
     }
 
-
-    private void placeStairBlock(BlockPos pos, Direction direction, Set<BlockPos> stairPositions, int c) {
+    private void placeStairBlock(BlockPos pos, Direction direction, Set<BlockPos> stairPositions, int currentHeight, int finalHeight, int currentFloorNumber, ContextUtils.RoomContext roomContext, Set<BlockPos> openPositions, Set<BlockPos> blockColumnShell) {
         BlockState stairState = stairBlock.block.defaultBlockState()
                 .setValue(BlockStateProperties.HORIZONTAL_FACING, direction);
         setBlock(pos, stairState, 3, BlockType.STAIRS);
         stairPositions.add(pos);
-        for (int x = 0; x < heightPerFloor; x++) {
+
+        for (int x = 0; x < finalHeight; x++) {
             BlockPos pos2 = pos.offset(0, x + 1, 0);
-            if (!level.getBlockState(pos2).is(stairBlock.block) && c <= heightPerFloor) {
+            if (!level.getBlockState(pos2).is(stairBlock.block) && currentHeight <= finalHeight) {
                 level.setBlock(pos2, Blocks.AIR.defaultBlockState(), 3);
                 stairPositions.add(pos2);
             }
-
+        }
+        if (currentHeight % roomContext.height == 0) {
+            createStairOpening(pos, direction.getOpposite(), openPositions);
         }
     }
 

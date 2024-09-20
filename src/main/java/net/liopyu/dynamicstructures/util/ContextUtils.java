@@ -23,6 +23,30 @@ import static net.liopyu.dynamicstructures.data.json.BlockInterpreter.allowedBlo
 import static net.liopyu.dynamicstructures.util.DSHelperClass.normalizeJson;
 
 public class ContextUtils {
+    public static class RoomContext {
+        public final int roomNumber;
+        public final boolean ladderRoom;
+        public boolean connectedToBottomStairs;
+        public final boolean stairRoom;
+        public final int height;
+        public final int length;
+        public final int width;
+
+        public RoomContext(int roomNumber, boolean ladderRoom, boolean stairRoom, int height, int length, int width) {
+            this.roomNumber = roomNumber;
+            this.ladderRoom = ladderRoom;
+            this.stairRoom = stairRoom;
+
+            this.height = height;
+            this.length = length;
+            this.width = width;
+        }
+
+        public void setConnectedToBottomStairs(boolean connectedToBottomStairs) {
+            this.connectedToBottomStairs = connectedToBottomStairs;
+        }
+    }
+
     public static class WeightedBlock {
         public Block block;
         public final int weight;
