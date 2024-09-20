@@ -201,7 +201,6 @@ public class Tower {
         roomContext.setConnectedToBottomStairs(previousRoomStairs && roomContext.stairRoom);
         var isConnectedToBottomStairs = roomContext.connectedToBottomStairs;
         Set<BlockPos> openPositions = new HashSet<>();
-
         int revisedHeightPerFloor = calculateRevisedHeight(roomNumber);
 
 
