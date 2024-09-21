@@ -219,7 +219,6 @@ public class Tower {
         var previousRoomStairs = isStairRoom(roomNumber - 1);
         roomContext.setConnectedToBottomStairs(previousRoomStairs && roomContext.stairRoom);
         var isConnectedToBottomStairs = roomContext.connectedToBottomStairs;
-        boolean startRoom = roomNumber == 0;
         int revisedHeightPerFloor = calculateRevisedHeight(roomNumber);
 
 
@@ -234,8 +233,9 @@ public class Tower {
                     BlockPos pos1 = currentPos.offset(0, x, 0);
                     blockColumnShell.add(pos1.relative(direction.getClockWise()));
                     BlockPos pos2 = currentPos.offset(0, -x, 0);
-
-                    blockColumnShell.add(pos2.relative(direction.getClockWise()));
+                    if (currentPos.getY() > this.startPos.getY()) {
+                        blockColumnShell.add(pos2.relative(direction.getClockWise()));
+                    }
                 }
 
                 currentPos = currentPos.relative(direction).above();
@@ -256,33 +256,25 @@ public class Tower {
                 var newpos2 = currentPos.relative(direction.getClockWise()).offset(0, -x, 0);
                 var newpos3 = currentPos.relative(direction.getClockWise()).relative(direction.getCounterClockWise()).offset(0, x, 0);
                 var newpos4 = currentPos.relative(direction.getClockWise()).relative(direction.getCounterClockWise()).offset(0, -x, 0);
-                if (newpos.getY() < topPos.getY() &&
-                        newpos2.getY() < topPos.getY() &&
-                        newpos3.getY() < topPos.getY() &&
-                        newpos4.getY() < topPos.getY()) {
-                    blockColumnShell.add(newpos);
-                    blockColumnShell.add(newpos2);
-                    blockColumnShell.add(newpos3);
-                    blockColumnShell.add(newpos4);
-                }
 
-
+                blockColumnShell.add(newpos);
+                blockColumnShell.add(newpos2);
+                blockColumnShell.add(newpos3);
+                blockColumnShell.add(newpos4);
             }
 
             currentPos = currentPos.relative(direction.getCounterClockWise()).relative(direction.getOpposite());
             direction = direction.getCounterClockWise();
 
         }
-
         for (BlockPos pos : blockColumnShell) {
             if (!openPositions.contains(pos)) {
                 if (pos.getY() > this.startPos.getY() &&
                         pos.getY() < topPos.getY() &&
                         !level.getBlockState(pos).is(floorBlock.block)
                 ) {
-                    setBlock(pos, Blocks.BEDROCK.defaultBlockState(), 3, BlockType.STAIRS);
+                    setBlock(pos, Blocks.STONE.defaultBlockState(), 3, BlockType.STAIRS);
                 }
-
             }
         }
         for (BlockPos pos : openPositions) {
@@ -317,37 +309,6 @@ public class Tower {
         return cumulativeHeight;
     }
 
-
-    private void fillCenterWithCobblestone(BlockPos initialPos, List<BlockPos> turnPoints, Set<BlockPos> positions, Direction direction, int maxHeight) {
-        BlockPos minPos = new BlockPos(
-                Math.min(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).min().orElse(initialPos.getX())),
-                initialPos.getY(),
-                Math.min(initialPos.getZ(), turnPoints.stream().mapToInt(BlockPos::getZ).min().orElse(initialPos.getZ()))
-        );
-
-        BlockPos maxPos = new BlockPos(
-                Math.max(initialPos.getX(), turnPoints.stream().mapToInt(BlockPos::getX).max().orElse(initialPos.getX())),
-                initialPos.getY() + maxHeight - 2,
-                Math.max(initialPos.getZ(), turnPoints.stream().mapToInt(BlockPos::getZ).max().orElse(initialPos.getZ()))
-        );
-
-        for (int x = minPos.getX(); x <= maxPos.getX(); x++) {
-            for (int y = minPos.getY(); y <= maxPos.getY(); y++) {
-                for (int z = minPos.getZ(); z <= maxPos.getZ(); z++) {
-                    BlockPos pos = new BlockPos(x, y, z);
-                    if (!level.getBlockState(pos).is(stairBlock.block) && !positions.contains(pos)) {
-                        placeBlock(pos, Blocks.COBBLESTONE, positions);
-                    }
-                }
-            }
-        }
-
-    }
-
-    private void placeBlock(BlockPos pos, Block block, Set<BlockPos> positions) {
-        level.setBlock(pos, block.defaultBlockState(), 3);
-        positions.add(pos);
-    }
 
     private void placeStairBlock(BlockPos pos, Direction direction, Set<BlockPos> stairPositions, int currentHeight, int finalHeight, int currentFloorNumber, ContextUtils.RoomContext roomContext, Set<BlockPos> openPositions, Set<BlockPos> blockColumnShell, int j) {
         BlockState stairState = stairBlock.block.defaultBlockState()
