@@ -25,92 +25,9 @@ import java.util.List;
 import java.util.Set;
 
 public class Dungeon extends BaseStructure {
-    public static final Block[] WALL_BLOCKS = {
-            Blocks.OAK_PLANKS, Blocks.STONE_BRICKS, Blocks.BRICKS, Blocks.COBBLESTONE
-    };
-    public static final Block[] FLOOR_BLOCKS = {
-            Blocks.STONE, Blocks.SMOOTH_STONE, Blocks.OAK_PLANKS, Blocks.COBBLESTONE
-    };
-    public static final Block[] ROOF_BLOCKS = {
-            Blocks.OAK_SLAB, Blocks.BRICK_SLAB, Blocks.STONE_SLAB, Blocks.COBBLESTONE_SLAB
-    };
-    public static final Block[] CENTER_BLOCKS = {
-            Blocks.AIR
-    };
-    public static final Block[] FILLER_BLOCKS = {
-            Blocks.AIR
-    };
-    public static final Block[] DOORWAY_BLOCKS = {
-            Blocks.AIR
-    };
-    protected static int defaultDoorwayRadius;
-    public final ContextUtils.StructureContext structureContext;
-    public final ServerLevel level;
-    public ContextUtils.WeightedBlock floorBlockW;
-    public ContextUtils.WeightedBlock wallBlockW;
-    public ContextUtils.WeightedBlock roofBlockW;
-    public ContextUtils.WeightedBlock centerBlockW;
-    public ContextUtils.WeightedBlock doorwayBlockW;
-    public ContextUtils.WeightedBlock fillerBlockW;
-    public int maxSpawners;
-    public int maxSpawnersPerRoom;
-    public int currentSpawners;
-    public List<EntityType<?>> potentialSpawns;
-    public boolean generatesSpawners;
-    public int sizeThreshold;
-    public int baseLength;
-    public int baseWidth;
-    public int height;
-    public int roomCount;
-    public float ladderRoomChance;
-    public int width;
-    public int length;
 
     public Dungeon(ContextUtils.StructureContext structureContext, ServerLevel level) {
         super(structureContext, level);
-        this.structureContext = structureContext;
-        this.level = level;
-        this.structureContext.level = level;
-        var blockContext = new ContextUtils.BlockContext(structureContext);
-        var random = level.random;
-        roofBlockW = blockContext.roofBlock;
-        wallBlockW = blockContext.wallBlock;
-        floorBlockW = blockContext.floorBlock;
-        fillerBlockW = blockContext.fillerBlock;
-        doorwayBlockW = blockContext.doorwayBlock;
-        centerBlockW = blockContext.centerBlock;
-        stairBlockW = blockContext.stairBlock;
-        defaultDoorwayRadius = blockContext.defaultDoorwayRadius;
-        if (roofBlockW == null) {
-            roofBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random), 1, null, BlockType.ROOF);
-        }
-        if (centerBlockW == null) {
-            centerBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(CENTER_BLOCKS).toList(), random), 1, null, BlockType.CENTER);
-        }
-        if (doorwayBlockW == null) {
-            doorwayBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(DOORWAY_BLOCKS).toList(), random), 1, null, BlockType.DOOR);
-        }
-        if (fillerBlockW == null) {
-            fillerBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(FILLER_BLOCKS).toList(), random), 1, null, BlockType.FILLER);
-        }
-        if (floorBlockW == null) {
-            floorBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(FLOOR_BLOCKS).toList(), random), 1, null, BlockType.FLOOR);
-        }
-        if (wallBlockW == null) {
-            wallBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random), 1, null, BlockType.WALLS);
-        }
-        if (stairBlockW == null) {
-            stairBlockW = new ContextUtils.WeightedBlock(Blocks.STONE_STAIRS, 1, null, BlockType.STAIRS);
-        }
-
-        blockContext.roofBlock = roofBlockW;
-        blockContext.wallBlock = wallBlockW;
-        blockContext.centerBlock = centerBlockW;
-        blockContext.doorwayBlock = doorwayBlockW;
-        blockContext.fillerBlock = fillerBlockW;
-        blockContext.floorBlock = floorBlockW;
-        blockContext.stairBlock = stairBlockW;
-
     }
 
     public int getRandomSize(RandomSource random) {
@@ -173,9 +90,9 @@ public class Dungeon extends BaseStructure {
     }
 
 
-    private Set<BlockPos> generateRoom(BlockPos pos, Set<BlockPos> overlapWalls, boolean isBottomRoom) {
+    private Set<BlockPos> generateRoom(BlockPos pos, Set<BlockPos> overlapWalls, boolean isBottomLadderRoom) {
         Set<BlockPos> wallPositions = new HashSet<>();
-        Set<BlockPos> roofPositions = isBottomRoom ? null : generateRoof(pos);
+        Set<BlockPos> roofPositions = isBottomLadderRoom ? null : generateRoof(pos);
 
         generateWalls(pos, wallPositions, overlapWalls, roofPositions);
         generateFloor(pos, wallPositions);
@@ -183,20 +100,6 @@ public class Dungeon extends BaseStructure {
         fillRoomInteriorWithAir(pos, wallPositions);
 
         return wallPositions;
-    }
-
-
-    private void fillRoomInteriorWithAir(BlockPos pos, Set<BlockPos> wallPositions) {
-        for (int x = 1; x < width - 1; x++) {
-            for (int z = 1; z < length - 1; z++) {
-                for (int y = 1; y <= height; y++) {
-                    BlockPos blockPos = pos.offset(x, y, z);
-                    if (!wallPositions.contains(blockPos)) {
-                        setBlock(blockPos, fillerBlockW, 3);
-                    }
-                }
-            }
-        }
     }
 
 

@@ -5,6 +5,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.ArrayList;
+import java.util.Set;
+
 public abstract class AbstractComponent {
     public final int roomNumber;
     protected BlockPos position;
@@ -18,9 +21,10 @@ public abstract class AbstractComponent {
         this.width = context.width;
         this.height = context.height;
         this.roomNumber = context.roomNumber;
+
     }
 
-    public abstract void place(Level world);
+    public abstract void place(ContextUtils.StructureContext context, BlockPos pos);
 
     public abstract BlockState getBlockState(BlockPos pos);
 

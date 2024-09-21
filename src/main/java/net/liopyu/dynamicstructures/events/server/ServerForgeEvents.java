@@ -152,23 +152,6 @@ public class ServerForgeEvents {
         return false;
     }
 
-    /**
-     * Executes the generation of custom structures within a chunk during its first-time load.
-     * This method retrieves the relevant structure contexts and spawn contexts, then iterates
-     * through them to determine which structures should be generated in the chunk.
-     * <p>
-     * For each structure context, it finds the corresponding spawn context and, if available,
-     * triggers the structure generation using {@link Dungeon#generateDungeon}.
-     * <p>
-     * Logs informative messages to indicate whether a structure is successfully spawned or if
-     * the corresponding spawn context is missing.
-     *
-     * @param chunk The chunk in which the structure generation is to be performed.
-     * @param level The server level where the chunk is located.
-     * @see Dungeon#generateDungeon
-     * @see ContextUtils.SpawnContext
-     * @see ContextUtils.StructureContext
-     */
     private static void performFirstTimeLoadAction(ContextUtils.SpawnContext spawnContext, ChunkAccess chunk, ServerLevel level) {
         Map<String, ContextUtils.StructureContext> structures = StructureLoader.loadStructures();
         for (ContextUtils.StructureContext structureContext : structures.values()) {
@@ -176,10 +159,10 @@ public class ServerForgeEvents {
                 DSHelperClass.logInfoMessageOnceDev("Spawning structure: " + structureContext.getStructureName() + " at " + chunk.getPos());
                 switch (structureContext.getStructureType()) {
                     case DUNGEON -> {
-                        new Dungeon(structureContext, level).generateDungeon();
+                        new Dungeon(structureContext, level).generate();
                     }
                     case TOWER -> {
-                        new Tower(structureContext, level).generateTower();
+                        new Tower(structureContext, level).generate();
                     }
                     default -> {
                         DSHelperClass.logErrorMessage("Unknown structure type: " + structureContext.getStructureType());

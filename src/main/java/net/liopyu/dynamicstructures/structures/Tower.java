@@ -2,7 +2,9 @@ package net.liopyu.dynamicstructures.structures;
 
 import net.liopyu.dynamicstructures.data.enums.BlockType;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
+import net.liopyu.dynamicstructures.structures.rooms.LadderRoom;
 import net.liopyu.dynamicstructures.structures.rooms.Room;
+import net.liopyu.dynamicstructures.structures.rooms.StairRoom;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
@@ -24,27 +26,26 @@ public class Tower extends BaseStructure {
 
     public Tower(ContextUtils.StructureContext structureContext, ServerLevel level) {
         super(structureContext, level);
-        this.structureContext.level = level;
-
         this.floorCount = structureContext.getRoomCount();
-
-
-        preCalculateRooms();
     }
 
 
     public void generate() {
         BlockPos currentPos = structureContext.getStartPos();
-        Set<BlockPos> wallPositions = new HashSet<>();
-        Set<BlockPos> stairPositions = new HashSet<>();
-        Set<BlockPos> blockColumnShell = new HashSet<>();
-        Set<BlockPos> openPositions = new HashSet<>();
         for (int i = 0; i < floorCount; i++) {
             boolean isLastFloor = (i == floorCount - 1);
             boolean generateStaircase = isStairRoom(i);
-
-            generateRoom(currentPos, wallPositions, isLastFloor, generateStaircase, stairPositions, i, blockColumnShell, openPositions);
-
+            boolean isLadderRoom = level.random.nextInt(100) < ladderRoomChance;
+            Room room = null;
+            if (generateStaircase && isLadderRoom) {
+                double random = Math.random();
+                if (random > 0.5) {
+                    room = new LadderRoom();
+                } else {
+                    room = new StairRoom();
+                }
+            }
+            generateRoom(currentPos, isLastFloor, generateStaircase, i);
             currentPos = currentPos.above(height);
         }
     }
@@ -59,20 +60,20 @@ public class Tower extends BaseStructure {
 
     public BlockPos topPos;
 
-    private void generateRoom(BlockPos pos, Set<BlockPos> wallPositions, boolean isLastFloor, boolean generateStaircase, Set<BlockPos> stairPositions, int roomNumber, Set<BlockPos> blockColumnShell, Set<BlockPos> openPositions) {
+    private void generateRoom(Room room, boolean isLastFloor, int roomNumber) {
         int maxHeight = height * floorCount;
         if (roomNumber == 0) {
-            topPos = pos.above(maxHeight);
+            topPos = room.position.above(maxHeight);
         }
 
-        if (generateStaircase) {
+        if (room.stairRoom) {
 
             BlockPos staircaseStartPos = pos.offset(width / 2, 1, length / 2);
 
-            generateCentralStaircase(staircaseStartPos, maxHeight, stairPositions, roomNumber, blockColumnShell, openPositions);
+            generateCentralStaircase(staircaseStartPos, maxHeight, room.stairPositions, roomNumber, room.blockColumnShell, room.openPositions);
         }
-        generateFloor(pos, wallPositions, stairPositions);
-        generateWalls(pos, wallPositions);
+        generateFloor(room.position, room.wallPositions, room.stairPositions);
+        generateWalls(room.position, room.wallPositions);
 
         if (isLastFloor) {
             generateRoof(topPos, roomNumber);

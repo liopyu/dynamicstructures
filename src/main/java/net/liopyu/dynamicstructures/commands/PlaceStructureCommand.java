@@ -99,10 +99,10 @@ public class PlaceStructureCommand {
 
             switch (structureContext.getStructureType()) {
                 case DUNGEON -> {
-                    new Dungeon(structureContext, level).generateDungeon();
+                    new Dungeon(structureContext, level).generate();
                 }
                 case TOWER -> {
-                    new Tower(structureContext, level).generateTower();
+                    new Tower(structureContext, level).generate();
                 }
                 default -> {
                     DSHelperClass.logErrorMessage("Unknown structure type: " + structureContext.getStructureType());

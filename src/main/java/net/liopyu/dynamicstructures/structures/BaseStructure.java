@@ -1,8 +1,15 @@
 package net.liopyu.dynamicstructures.structures;
 
 import net.liopyu.dynamicstructures.data.enums.BlockType;
+import net.liopyu.dynamicstructures.data.enums.RoomType;
 import net.liopyu.dynamicstructures.data.json.BlockInterpreter;
+import net.liopyu.dynamicstructures.structures.components.Floor;
+import net.liopyu.dynamicstructures.structures.components.Roof;
+import net.liopyu.dynamicstructures.structures.components.Wall;
+import net.liopyu.dynamicstructures.structures.rooms.BasicRoom;
+import net.liopyu.dynamicstructures.structures.rooms.LadderRoom;
 import net.liopyu.dynamicstructures.structures.rooms.Room;
+import net.liopyu.dynamicstructures.structures.rooms.StairRoom;
 import net.liopyu.dynamicstructures.util.ContextUtils;
 import net.liopyu.dynamicstructures.util.DSHelperClass;
 import net.minecraft.core.BlockPos;
@@ -13,7 +20,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LadderBlock;
-import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -100,6 +106,7 @@ public abstract class BaseStructure {
         fillerBlockW = blockContext.fillerBlock;
         doorwayBlockW = blockContext.doorwayBlock;
         centerBlockW = blockContext.centerBlock;
+        stairBlockW = blockContext.stairBlock;
         defaultDoorwayRadius = blockContext.defaultDoorwayRadius;
         if (roofBlockW == null) {
             roofBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random), 1, null, BlockType.ROOF);
@@ -119,6 +126,9 @@ public abstract class BaseStructure {
         if (wallBlockW == null) {
             wallBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random), 1, null, BlockType.WALLS);
         }
+        if (stairBlockW == null) {
+            stairBlockW = new ContextUtils.WeightedBlock(Blocks.STONE_STAIRS, 1, null, BlockType.STAIRS);
+        }
 
         blockContext.roofBlock = roofBlockW;
         blockContext.wallBlock = wallBlockW;
@@ -126,6 +136,7 @@ public abstract class BaseStructure {
         blockContext.doorwayBlock = doorwayBlockW;
         blockContext.fillerBlock = fillerBlockW;
         blockContext.floorBlock = floorBlockW;
+        blockContext.stairBlock = stairBlockW;
 
     }
 
@@ -140,7 +151,7 @@ public abstract class BaseStructure {
     }
 
     public boolean isStairRoom(int roomNumber) {
-        return roomNumber != -1 && roomContexts.get(roomNumber).stairRoom;
+        return roomNumber != -1 && roomContexts.get(roomNumber) instanceof StairRoom;
     }
 
     public int getRandomSize(RandomSource random) {
@@ -195,11 +206,13 @@ public abstract class BaseStructure {
         }
     }
 
-    public void generateLadderRoom(BlockPos basePos, Direction currentDirection, Set<BlockPos> overlapWalls) {
-        Set<BlockPos> roomWalls = generateRoom(basePos, overlapWalls, true);
+    public Set<BlockPos> ladderPositions = new HashSet<>();
+
+    public void generateLadderRoom(BlockPos pos, Direction currentDirection) {
+        LadderRoom roomWalls = generateRoom(pos);
 
         Direction ladderFacing = Direction.EAST;
-        BlockPos ladderBase = basePos.offset(width / 2 - 1, 1, length / 2 - 1);
+        BlockPos ladderBase = pos.offset(width / 2 - 1, 1, length / 2 - 1);
 
         for (int i = 0; i < height; i++) {
             BlockPos ladderPos = ladderBase.above(i + 1);
@@ -207,32 +220,43 @@ public abstract class BaseStructure {
                     .setValue(LadderBlock.FACING, ladderFacing)
                     .setValue(LadderBlock.WATERLOGGED, false);
             setBlock(ladderPos, ladderState, 3, BlockType.CENTER);
+            ladderPositions.add(ladderPos);
         }
 
-        BlockPos topRoomPos = basePos.above(height + 1);
-        Set<BlockPos> upperRoomWalls = generateRoom(topRoomPos, roomWalls, false);
+        BlockPos topRoomPos = pos.above(height + 1);
+        Room room = generateRoom(topRoomPos);
 
         BlockPos opening = ladderBase.above(height + 1);
         setBlock(opening, Blocks.AIR.defaultBlockState(), 3, BlockType.CENTER);
-        placeDoorway(basePos, currentDirection, level.random);
+        placeDoorway(pos, currentDirection, level.random);
 
     }
 
 
-    private Set<BlockPos> generateRoom(BlockPos pos, Set<BlockPos> overlapWalls, boolean isBottomRoom) {
+    private Room generateRoom(BlockPos pos, RoomType roomType) {
         Set<BlockPos> wallPositions = new HashSet<>();
-        Set<BlockPos> roofPositions = isBottomRoom ? null : generateRoof(pos);
 
-        generateWalls(pos, wallPositions, overlapWalls, roofPositions);
-        generateFloor(pos, wallPositions);
+        Roof roof = generateRoof(pos);
+        Wall wall = generateWalls(pos, wallPositions, roof.roofPositions);
+        Floor floor = generateFloor(pos, wallPositions);
 
         fillRoomInteriorWithAir(pos, wallPositions);
-
-        return wallPositions;
+        Room room;
+        switch (roomType) {
+            case STAIR -> {
+                return new StairRoom();
+            }
+            case LADDER -> {
+                return new LadderRoom();
+            }
+            default -> {
+                return new BasicRoom();
+            }
+        }
     }
 
 
-    private void fillRoomInteriorWithAir(BlockPos pos, Set<BlockPos> wallPositions) {
+    protected void fillRoomInteriorWithAir(BlockPos pos, Set<BlockPos> wallPositions) {
         for (int x = 1; x < width - 1; x++) {
             for (int z = 1; z < length - 1; z++) {
                 for (int y = 1; y <= height; y++) {
@@ -246,32 +270,23 @@ public abstract class BaseStructure {
     }
 
 
-    private void generateFloor(BlockPos pos, Set<BlockPos> wallPositions) {
-        for (int x = 0; x < width; x++) {
-            for (int z = 0; z < length; z++) {
-                BlockPos floorPos = pos.offset(x, 0, z);
-                if (level.getBlockState(floorPos).getBlock() instanceof LadderBlock) {
-                    setBlock(floorPos, Blocks.AIR.defaultBlockState(), 3, BlockType.FLOOR);
-                } else if (!wallPositions.contains(floorPos)) {
-                    setBlock(floorPos, floorBlockW, 3);
-                }
-            }
-        }
+    private Floor generateFloor(BlockPos pos, Set<BlockPos> wallPositions) {
+
     }
 
-    private void generateWalls(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, Set<BlockPos> roofPositions) {
+    private Wall generateWalls(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> roofPositions) {
         for (int y = 1; y <= height + 1; y++) {
             for (int x = 0; x < width; x++) {
                 BlockPos wallPos1 = pos.offset(x, y, 0);
                 BlockPos wallPos2 = pos.offset(x, y, length - 1);
-                addWallBlock(wallPos1, wallPositions, overlapWalls, roofPositions);
-                addWallBlock(wallPos2, wallPositions, overlapWalls, roofPositions);
+                addWallBlock(wallPos1, wallPositions, roofPositions);
+                addWallBlock(wallPos2, wallPositions, roofPositions);
             }
             for (int z = 1; z < length - 1; z++) {
                 BlockPos wallPos1 = pos.offset(0, y, z);
                 BlockPos wallPos2 = pos.offset(width - 1, y, z);
-                addWallBlock(wallPos1, wallPositions, overlapWalls, roofPositions);
-                addWallBlock(wallPos2, wallPositions, overlapWalls, roofPositions);
+                addWallBlock(wallPos1, wallPositions, roofPositions);
+                addWallBlock(wallPos2, wallPositions, roofPositions);
             }
         }
     }
@@ -319,8 +334,8 @@ public abstract class BaseStructure {
              wallPositions.add(pos);
          }
      }*/
-    private void addWallBlock(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> overlapWalls, Set<BlockPos> roofPositions) {
-        if (overlapWalls != null && overlapWalls.contains(pos) && isSharedWall(pos, overlapWalls)) {
+    private void addWallBlock(BlockPos pos, Set<BlockPos> wallPositions, Set<BlockPos> roofPositions) {
+        if (wallPositions.contains(pos)) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         } else {
             setBlock(pos, wallBlockW, 3);
@@ -329,22 +344,10 @@ public abstract class BaseStructure {
     }
 
 
-    private Set<BlockPos> generateRoof(BlockPos pos) {
-        Set<BlockPos> roofPositions = new HashSet<>();
-        for (int x = 0; x < width; x++) {
-            for (int z = 0; z < length; z++) {
-                BlockPos roofPos = pos.offset(x, height + 1, z);
-                if (level.getBlockState(roofPos).getBlock() instanceof LiquidBlock ||
-                        level.getBlockState(roofPos).isAir() ||
-                        level.getBlockState(roofPos).is(Blocks.CAVE_AIR) ||
-                        wallBlockW.block.equals(level.getBlockState(roofPos).getBlock())) {
-
-                    setBlock(roofPos, roofBlockW, 3);
-                    roofPositions.add(roofPos);
-                }
-            }
-        }
-        return roofPositions;
+    private Roof generateRoof(BlockPos pos) {
+        var roof = new Roof();
+        Set<BlockPos> roofPositions = roof.roofPositions;
+        return roof;
     }
 
 
