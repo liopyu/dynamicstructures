@@ -19,12 +19,9 @@ import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-public class Dungeon extends BaseStructure {
+public abstract class BaseStructure {
     public static final Block[] WALL_BLOCKS = {
             Blocks.OAK_PLANKS, Blocks.STONE_BRICKS, Blocks.BRICKS, Blocks.COBBLESTONE
     };
@@ -52,34 +49,57 @@ public class Dungeon extends BaseStructure {
     public ContextUtils.WeightedBlock centerBlockW;
     public ContextUtils.WeightedBlock doorwayBlockW;
     public ContextUtils.WeightedBlock fillerBlockW;
-    public int maxSpawners;
-    public int maxSpawnersPerRoom;
+    public ContextUtils.WeightedBlock stairBlockW;
+    public final int maxSpawners;
+    public final int maxSpawnersPerRoom;
     public int currentSpawners;
-    public List<EntityType<?>> potentialSpawns;
-    public boolean generatesSpawners;
-    public int sizeThreshold;
-    public int baseLength;
-    public int baseWidth;
+    public final List<EntityType<?>> potentialSpawns;
+    public final boolean generatesSpawners;
+    public final int sizeThreshold;
+    public final int baseLength;
+    public final int baseWidth;
     public int height;
-    public int roomCount;
-    public float ladderRoomChance;
+    public final int roomCount;
+    public final float ladderRoomChance;
     public int width;
     public int length;
+    public Direction currentDirection;
+    public final int staircaseRadius;
+    public final int staircaseFactor;
+    public final List<Room> roomContexts = new ArrayList<>();
+    public final BlockPos startPos;
 
-    public Dungeon(ContextUtils.StructureContext structureContext, ServerLevel level) {
-        super(structureContext, level);
+    public BaseStructure(ContextUtils.StructureContext structureContext, ServerLevel level) {
         this.structureContext = structureContext;
         this.level = level;
         this.structureContext.level = level;
+        this.currentDirection = structureContext.getStartDirection();
+        this.staircaseFactor = structureContext.getStaircaseFactor();
+        this.ladderRoomChance = structureContext.getLadderRoomChance();
+        this.roomCount = structureContext.getRoomCount();
+        this.height = structureContext.getHeight();
+        this.baseWidth = structureContext.getWidth();
+        this.baseLength = structureContext.getLength();
+        this.sizeThreshold = structureContext.getSizeThreshold();
+        this.generatesSpawners = structureContext.isGeneratesSpawners();
+        this.maxSpawners = structureContext.getMaxSpawners();
+        this.maxSpawnersPerRoom = structureContext.getMaxSpawnersPerRoom();
+        this.potentialSpawns = structureContext.getPotentialSpawns();
+        this.startPos = structureContext.getStartPos();
         var blockContext = new ContextUtils.BlockContext(structureContext);
         var random = level.random;
+
+        int originalRadius = structureContext.getStaircaseRadius();
+        int minRadius = Math.min(width, length);
+        int maxRadius = Math.max(minRadius / this.staircaseFactor, 1);
+        this.staircaseRadius = Math.min(originalRadius, maxRadius);
+
         roofBlockW = blockContext.roofBlock;
         wallBlockW = blockContext.wallBlock;
         floorBlockW = blockContext.floorBlock;
         fillerBlockW = blockContext.fillerBlock;
         doorwayBlockW = blockContext.doorwayBlock;
         centerBlockW = blockContext.centerBlock;
-        stairBlockW = blockContext.stairBlock;
         defaultDoorwayRadius = blockContext.defaultDoorwayRadius;
         if (roofBlockW == null) {
             roofBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(ROOF_BLOCKS).toList(), random), 1, null, BlockType.ROOF);
@@ -99,9 +119,6 @@ public class Dungeon extends BaseStructure {
         if (wallBlockW == null) {
             wallBlockW = new ContextUtils.WeightedBlock(selectRandomBlock(Arrays.stream(WALL_BLOCKS).toList(), random), 1, null, BlockType.WALLS);
         }
-        if (stairBlockW == null) {
-            stairBlockW = new ContextUtils.WeightedBlock(Blocks.STONE_STAIRS, 1, null, BlockType.STAIRS);
-        }
 
         blockContext.roofBlock = roofBlockW;
         blockContext.wallBlock = wallBlockW;
@@ -109,8 +126,21 @@ public class Dungeon extends BaseStructure {
         blockContext.doorwayBlock = doorwayBlockW;
         blockContext.fillerBlock = fillerBlockW;
         blockContext.floorBlock = floorBlockW;
-        blockContext.stairBlock = stairBlockW;
 
+    }
+
+    public void generate() {
+        preCalculateRooms();
+    }
+
+    public abstract void preCalculateRooms();
+
+    public Room getRoomContext(int roomNumber) {
+        return roomNumber == -1 ? null : roomContexts.get(roomNumber);
+    }
+
+    public boolean isStairRoom(int roomNumber) {
+        return roomNumber != -1 && roomContexts.get(roomNumber).stairRoom;
     }
 
     public int getRandomSize(RandomSource random) {
@@ -119,10 +149,26 @@ public class Dungeon extends BaseStructure {
     }
 
 
-    public RandomSource getRandom() {
-        return level.random;
+    protected void placeSpawners(Room room) {
+        if (currentSpawners >= maxSpawners) {
+            return;
+        }
+        var pos = room.position;
+        var random = level.getRandom();
+        for (int i = 0; i < maxSpawnersPerRoom; i++) {
+            int x = pos.getX() + random.nextInt(width);
+            int y = pos.getY() + random.nextInt(height);
+            int z = pos.getZ() + random.nextInt(length);
+            BlockPos spawnerPos = new BlockPos(x, y, z);
+            EntityType<?> entityType = potentialSpawns.get(random.nextInt(potentialSpawns.size()));
+            setBlock(spawnerPos, Blocks.SPAWNER.defaultBlockState(), 3, BlockType.CENTER);
+            BlockEntity blockEntity = level.getBlockEntity(spawnerPos);
+            if (blockEntity instanceof SpawnerBlockEntity spawnerEntity) {
+                spawnerEntity.getSpawner().setEntityId(entityType, level, level.random, spawnerPos);
+                currentSpawners++;
+            }
+        }
     }
-
 
     public void setBlock(BlockPos pPos, ContextUtils.WeightedBlock weightedBlock, int pFlags) {
         var pNewState = weightedBlock.block.defaultBlockState();
@@ -371,6 +417,10 @@ public class Dungeon extends BaseStructure {
         };
     }
 
+    protected Block selectRandomBlock(List<Block> blocks, RandomSource random) {
+        return blocks.get(random.nextInt(blocks.size()));
+    }
+
 
     public ContextUtils.StructureContext getStructureContext() {
         return structureContext;
@@ -381,40 +431,4 @@ public class Dungeon extends BaseStructure {
     }
 
 
-    @Override
-    public void preCalculateRooms() {
-        Set<BlockPos> previousRoomWalls = null;
-        var currentPos = structureContext.getStartPos();
-        var currentDirection = structureContext.getStartDirection();
-        var random = level.random;
-        for (int i = 0; i < roomCount; i++) {
-            width = getRandomSize(random);
-            length = getRandomSize(random);
-            boolean isLadderRoom = random.nextInt(100) < ladderRoomChance;
-            if (isLadderRoom) {
-                generateLadderRoom(currentPos, currentDirection, previousRoomWalls);
-                placeDoorway(currentPos, currentDirection, random);
-                BlockPos upperRoomPos = currentPos.above(height + 1);
-                placeDoorway(upperRoomPos, currentDirection, random);
-                if (generatesSpawners) {
-                    placeSpawners(getRoomContext(i));
-                    placeSpawners(getRoomContext(i));
-                }
-                roomContexts.add(new Room(i, currentPos, isLadderRoom, false, height, length, width));
-                currentPos = calculateNextRoomPos(upperRoomPos, currentDirection);
-            } else {
-                Set<BlockPos> currentRoomWalls = generateRoom(currentPos, previousRoomWalls, false);
-                previousRoomWalls = currentRoomWalls;
-                placeDoorway(currentPos, currentDirection, random);
-                if (generatesSpawners) {
-                    placeSpawners(getRoomContext(i));
-                }
-                roomContexts.add(new Room(i, currentPos, isLadderRoom, false, height, length, width));
-                currentPos = calculateNextRoomPos(currentPos, currentDirection);
-            }
-
-            currentDirection = random.nextBoolean() ? currentDirection.getClockWise() : currentDirection.getCounterClockWise();
-
-        }
-    }
 }
